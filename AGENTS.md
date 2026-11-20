@@ -32,9 +32,18 @@ crew/                   task lifecycle (single source of truth for work tracking
 
 ## Verified commands
 
-No command verified yet: the Python package does not exist at bootstrap time.
-This section is filled in by the `chore: init src layout` commit with the
-install / test / lint commands actually run.
+Run from the repo root (Windows: `.venv/Scripts/`, Linux/macOS: `.venv/bin/`).
+
+```bash
+py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pytest              # tests + coverage gate (80 %)
+.venv/Scripts/ruff check . && .venv/Scripts/ruff format --check .
+.venv/Scripts/surfacemap scope check www.logan-villard.fr   # needs ./scope.yaml (gitignored)
+```
+
+Do not pipe rich/typer output into `head` on Windows: the closed pipe raises a
+spurious `OSError: [Errno 22]` traceback.
 
 ## Code rules
 
