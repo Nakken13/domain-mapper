@@ -20,7 +20,10 @@ classifiers = [
     "Topic :: Security",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
 
 [project.optional-dependencies]
 dev = [
