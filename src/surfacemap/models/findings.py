@@ -41,29 +41,30 @@ class Severity(StrEnum):
     HIGH = "high"
     CRITICAL = "critical"
 
-    @property
-    def rank(self) -> int:
-        return list(Severity).index(self)
+    def _ranks(self, other: object) -> tuple[int, int]:
+        # Refuse plain strings: StrEnum would otherwise fall back to alphabetical order.
+        if not isinstance(other, Severity):
+            raise TypeError(f"cannot compare Severity with {type(other).__name__}")
+        return _RANK[self], _RANK[other]
 
     def __lt__(self, other: object) -> bool:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.rank < other.rank
+        mine, theirs = self._ranks(other)
+        return mine < theirs
 
     def __le__(self, other: object) -> bool:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.rank <= other.rank
+        mine, theirs = self._ranks(other)
+        return mine <= theirs
 
     def __gt__(self, other: object) -> bool:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.rank > other.rank
+        mine, theirs = self._ranks(other)
+        return mine > theirs
 
     def __ge__(self, other: object) -> bool:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.rank >= other.rank
+        mine, theirs = self._ranks(other)
+        return mine >= theirs
+
+
+_RANK = {severity: rank for rank, severity in enumerate(Severity)}
 
 
 def _not_blank(value: str) -> str:

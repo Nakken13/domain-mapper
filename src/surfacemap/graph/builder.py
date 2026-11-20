@@ -13,6 +13,9 @@ independent of arrival order (async collection finishes in any order):
 * a missing value (`None`) is filled by the other source;
 * `last_seen`: the latest date; every other conflict: the smallest value. For `in_scope`
   that means `False` wins (fail closed: one source saying out-of-scope is enough).
+
+Node and edge *values* are order-independent; the *iteration order* of `nodes`/`edges`
+follows arrival order, so exports must sort (by id / edge key) for reproducible output.
 """
 
 from __future__ import annotations

@@ -12,7 +12,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import BeforeValidator, Field, field_validator, model_validator
 
 from surfacemap.models.base import FrozenModel, UtcDatetime
 from surfacemap.scope import normalize_domain
@@ -34,7 +34,11 @@ def _normalize_country(value: object) -> object:
     return country
 
 
-class _Entity(FrozenModel, ABC):
+Country = Annotated[str | None, BeforeValidator(_normalize_country)]
+"""Optional ISO 3166-1 alpha-2 code, uppercased."""
+
+
+class BaseEntity(FrozenModel, ABC):
     @property
     @abstractmethod
     def id(self) -> str:
@@ -53,7 +57,7 @@ class DnsRecord(FrozenModel):
         return value.strip().upper()
 
 
-class Domain(_Entity):
+class Domain(BaseEntity):
     kind: Literal["domain"] = "domain"
     fqdn: str
     in_scope: bool
@@ -69,31 +73,26 @@ class Domain(_Entity):
         return f"domain:{self.fqdn}"
 
 
-class IPAddress(_Entity):
+class IPAddress(BaseEntity):
     kind: Literal["ip"] = "ip"
     address: str
-    country: str | None = None
+    country: Country = None
 
     @field_validator("address")
     @classmethod
     def _compress(cls, value: str) -> str:
         return ipaddress.ip_address(value.strip()).compressed
 
-    @field_validator("country", mode="before")
-    @classmethod
-    def _country(cls, value: object) -> object:
-        return _normalize_country(value)
-
     @property
     def id(self) -> str:
         return f"ip:{self.address}"
 
 
-class ASN(_Entity):
+class ASN(BaseEntity):
     kind: Literal["asn"] = "asn"
     number: int = Field(ge=1, le=_MAX_ASN)
     holder: str | None = None
-    country: str | None = None
+    country: Country = None
 
     @field_validator("number", mode="before")
     @classmethod
@@ -102,17 +101,12 @@ class ASN(_Entity):
             return value.strip().upper().removeprefix("AS")
         return value
 
-    @field_validator("country", mode="before")
-    @classmethod
-    def _country(cls, value: object) -> object:
-        return _normalize_country(value)
-
     @property
     def id(self) -> str:
         return f"asn:{self.number}"
 
 
-class Certificate(_Entity):
+class Certificate(BaseEntity):
     kind: Literal["certificate"] = "certificate"
     sha256: str
     issuer: str
@@ -144,18 +138,31 @@ class Certificate(_Entity):
         return f"cert:{self.sha256}"
 
 
-class Technology(_Entity):
+class Technology(BaseEntity):
     kind: Literal["technology"] = "technology"
-    name: str = Field(min_length=1)
+    name: str
     category: str
-    evidence: str
+    evidence: tuple[str, ...] = ()
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("technology name must not be blank")
+        return name
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _single_evidence(cls, value: object) -> object:
+        return (value,) if isinstance(value, str) else value
 
     @property
     def id(self) -> str:
-        return f"tech:{self.name.strip().lower()}"
+        return f"tech:{self.name.lower()}"
 
 
-class ArchivedURL(_Entity):
+class ArchivedURL(BaseEntity):
     """A URL seen in a web archive. Query strings and fragments are never stored."""
 
     kind: Literal["archived_url"] = "archived_url"

@@ -5,15 +5,24 @@ from __future__ import annotations
 import re
 from enum import StrEnum
 from typing import Self
+from urllib.parse import unquote
 
 from pydantic import Field, field_validator, model_validator
 
 from surfacemap.models.base import FrozenModel, UtcDatetime
+from surfacemap.models.entities import BaseEntity
 
-# Parameter-like credentials (`key=`, `api_key:`, `token=`, …) must never reach the cache,
-# the graph or the report. Matching is deliberately broad: a false positive only means the
-# plugin has to describe its query without the secret.
-_CREDENTIAL = re.compile(r"(api[_-]?key|key|token|secret|password|passwd)\s*[=:]", re.IGNORECASE)
+# Credentials must never reach the cache, the graph or the report. Matched on the
+# URL-decoded query: `name=`/`name:` parameters (also `access_token`, `x_api_key`, …),
+# HTTP auth headers and `user:password@` userinfo. Deliberately broad: a false positive
+# only means the plugin has to describe its query without the secret.
+_CREDENTIAL = re.compile(
+    r"(?<![a-z0-9])(?:[a-z0-9]+[_-])*"
+    r"(?:api[_-]?key|key|token|secret|password|passwd|pass|pwd|auth|sig|signature)\s*[=:]"
+    r"|\b(?:authorization|bearer)\b"
+    r"|://[^/@\s]+:[^/@\s]*@",
+    re.IGNORECASE,
+)
 
 
 class RelationType(StrEnum):
@@ -47,7 +56,12 @@ def _kind(entity_id: str) -> str:
 
 
 class Relation(FrozenModel):
-    """A directed edge `source -[type]-> target`, endpoints given as entity ids."""
+    """A directed edge `source -[type]-> target`, endpoints given as entity ids.
+
+    Prefer `Relation.between(entity, type, entity)`: raw id strings are not normalized.
+    An edge may reference a node emitted by another observation, so the graph accepts
+    edges whose endpoints are not (yet) nodes.
+    """
 
     source: str = Field(min_length=3)
     type: RelationType
@@ -65,6 +79,11 @@ class Relation(FrozenModel):
         if self.source == self.target:
             raise ValueError("a relation cannot point to its own source")
         return self
+
+    @classmethod
+    def between(cls, source: BaseEntity, type: RelationType, target: BaseEntity) -> Relation:
+        """Build a relation from entities, so endpoints always carry their canonical ids."""
+        return cls(source=source.id, type=type, target=target.id)
 
     @property
     def key(self) -> tuple[str, RelationType, str]:
@@ -93,6 +112,6 @@ class Provenance(FrozenModel):
     @field_validator("query")
     @classmethod
     def _no_credentials(cls, value: str) -> str:
-        if _CREDENTIAL.search(value):
+        if _CREDENTIAL.search(unquote(value)):
             raise ValueError("query must not carry a credential (key/token/secret parameter)")
         return value

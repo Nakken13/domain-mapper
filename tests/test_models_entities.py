@@ -136,3 +136,20 @@ def test_entity_union_is_discriminated_by_kind() -> None:
     entity = adapter.validate_python({"kind": "ip", "address": "192.0.2.1"})
     assert isinstance(entity, IPAddress)
     assert adapter.validate_python(entity.model_dump()) == entity
+
+
+def test_validation_errors_never_echo_the_input() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        Certificate(sha256=SHA, issuer="R3", not_before=T0, not_after=T1, sans="jane@example.com")  # type: ignore[arg-type]
+    assert "jane@example.com" not in str(excinfo.value)
+
+
+def test_technology_name_is_stripped_and_blank_refused() -> None:
+    assert Technology(name=" Nginx ", category="web-server").name == "Nginx"
+    with pytest.raises(ValidationError):
+        Technology(name="   ", category="web-server")
+
+
+def test_technology_evidence_is_a_tuple() -> None:
+    tech = Technology(name="nginx", category="web-server", evidence=["Server header"])
+    assert tech.evidence == ("Server header",)

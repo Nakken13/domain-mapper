@@ -82,3 +82,8 @@ def test_finding_holds_explainable_fields() -> None:
 def test_finding_refuses_unexplained_or_malformed_input(overrides: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         _finding(**overrides)
+
+
+def test_severity_refuses_comparison_with_plain_strings() -> None:
+    with pytest.raises(TypeError):
+        _ = Severity.CRITICAL < "high"

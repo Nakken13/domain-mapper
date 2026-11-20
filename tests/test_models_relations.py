@@ -74,3 +74,40 @@ def test_provenance_query_refuses_credentials(query: str) -> None:
 def test_provenance_source_must_not_be_blank() -> None:
     with pytest.raises(ValidationError):
         Provenance(source=" ", retrieved_at=NOW, query="x")
+
+
+def test_credentials_never_appear_in_the_error_message() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        Provenance(source="shodan", retrieved_at=NOW, query="https://api.x/?key=SUPERSECRET123")
+    assert "SUPERSECRET123" not in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Authorization: Bearer abc",
+        "https://user:pass@api.example/",
+        "auth=abc",
+        "sig=abc",
+        "pwd=abc",
+        "access_token=abc",
+        "https://api.example/?key%3Dabc",
+    ],
+)
+def test_provenance_query_refuses_more_credential_shapes(query: str) -> None:
+    with pytest.raises(ValidationError, match="credential"):
+        Provenance(source="x", retrieved_at=NOW, query=query)
+
+
+@pytest.mark.parametrize("query", ["monkey=1", "%.example.com", "hostname:example.com"])
+def test_provenance_query_accepts_innocent_text(query: str) -> None:
+    assert Provenance(source="x", retrieved_at=NOW, query=query).query == query
+
+
+def test_relation_between_uses_canonical_entity_ids() -> None:
+    from surfacemap.models import Domain
+
+    apex = Domain(fqdn="Example.com", in_scope=True)
+    www = Domain(fqdn="WWW.example.com", in_scope=True)
+    rel = Relation.between(apex, RelationType.HAS_SUBDOMAIN, www)
+    assert rel.key == ("domain:example.com", RelationType.HAS_SUBDOMAIN, "domain:www.example.com")
