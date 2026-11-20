@@ -1,0 +1,9 @@
+# Copy to `scope.yaml` (gitignored). SurfaceMap refuses any domain not listed here.
+# List ONLY domains you own or have a WRITTEN authorization to assess
+# (unauthorized access attempts: French Penal Code, art. 323-1).
+
+authorized:
+  - domain: example.com            # reserved example domain (RFC 2606)
+    include_subdomains: true       # default: true
+    authorization: "owner"         # or the reference of the written authorization
+    expires: 2027-12-31            # optional: refused after this date
