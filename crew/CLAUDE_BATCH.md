@@ -5,10 +5,52 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 ## Unsorted
 
-<Tasks whose impact zone is not known yet.>
-
 ## Batch A
 
-Zone: <files/modules>
+Zone: `src/surfacemap/models/`, `src/surfacemap/privacy.py`, `src/surfacemap/graph/builder.py`, `tests/`
 
-- `<slug>.md`
+- `data-model.md`
+
+## Batch B
+
+Zone: `src/surfacemap/collect/`, `src/surfacemap/plugins/base.py`, `tests/`
+
+- `collection-engine.md`
+
+## Batch C
+
+Zone: `src/surfacemap/plugins/`, `tests/fixtures/`, `tests/`
+
+- `passive-plugins.md`
+
+## Batch D
+
+Zone: `src/surfacemap/risk/`, `tests/`
+
+- `risk-rules.md`
+
+## Batch E
+
+Zone: `src/surfacemap/graph/` (except `src/surfacemap/graph/builder.py`), `docker-compose.yml`, `tests/`
+
+- `graph-export.md`
+
+## Batch F
+
+Zone: `src/surfacemap/report/`, `src/surfacemap/cli.py`, `tests/`
+
+- `html-report.md`
+
+## Batch G
+
+Zone: `evaluation/`, `docs/`
+
+- `evaluation.md`
+
+## Batch H
+
+Zone: `README.md`, `docs/`, `media/`
+
+- `readme-docs.md`
+
+Note: phases are sequential (see `Depends on:` in each task); only one batch is active at a time, which is why the shared `tests/` and `docs/` zones do not violate the disjointness invariant. Never start a phase while another is in `CURRENT_TASKS/`.
