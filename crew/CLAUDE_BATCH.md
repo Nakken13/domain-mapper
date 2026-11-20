@@ -9,7 +9,7 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 Zone: `src/surfacemap/models/`, `src/surfacemap/privacy.py`, `src/surfacemap/graph/builder.py`, `tests/`
 
-- `data-model.md`
+- ~~`data-model.md`~~
 
 ## Batch B
 
