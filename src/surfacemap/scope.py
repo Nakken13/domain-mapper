@@ -102,7 +102,7 @@ class ScopeDecision:
 
 class Scope:
     def __init__(self, entries: list[ScopeEntry]) -> None:
-        # Most specific entry first, so a child entry wins over its parent.
+        # Longest (most specific) domain first: see check() for the precedence rule.
         self.entries = sorted(entries, key=lambda e: len(e.domain), reverse=True)
 
     @classmethod
@@ -130,17 +130,22 @@ class Scope:
         except InvalidDomainError as exc:
             return ScopeDecision(allowed=False, reason=f"invalid domain: {exc}")
 
-        reason = f"{domain} is not listed in the scope file"
-        for entry in self.entries:
-            if entry.covers(domain):
-                if entry.is_expired(today):
-                    reason = f"authorization for {entry.domain} expired on {entry.expires}"
-                    continue
-                return ScopeDecision(
-                    allowed=True, reason=f"covered by {entry.domain}", domain=domain, entry=entry
-                )
-            if domain.endswith("." + entry.domain) and not entry.include_subdomains:
-                reason = f"subdomains of {entry.domain} are not authorized"
+        # The most specific entry naming the domain or one of its parents decides
+        # alone (fail closed): a parent never overrides a restrictive or expired child.
+        entry = next(
+            (e for e in self.entries if domain == e.domain or domain.endswith("." + e.domain)),
+            None,
+        )
+        if entry is None:
+            reason = f"{domain} is not listed in the scope file"
+        elif not entry.covers(domain):
+            reason = f"subdomains of {entry.domain} are not authorized"
+        elif entry.is_expired(today):
+            reason = f"authorization for {entry.domain} expired on {entry.expires}"
+        else:
+            return ScopeDecision(
+                allowed=True, reason=f"covered by {entry.domain}", domain=domain, entry=entry
+            )
         return ScopeDecision(allowed=False, reason=reason, domain=domain)
 
     def require(self, raw_domain: str, today: date | None = None) -> str:

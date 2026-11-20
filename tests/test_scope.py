@@ -154,7 +154,7 @@ def test_require_returns_normalized_domain(scope: Scope) -> None:
 
 
 def test_require_raises_when_out_of_scope(scope: Scope) -> None:
-    with pytest.raises(OutOfScopeError, match=r"evil-logan-villard.fr"):
+    with pytest.raises(OutOfScopeError, match=r"evil-logan-villard\.fr"):
         scope.require("evil-logan-villard.fr", today=TODAY)
 
 
@@ -208,3 +208,42 @@ authorized:
     )
     assert loaded.check("v2.api.parent.example", today=TODAY).allowed
     assert not loaded.check("www.parent.example", today=TODAY).allowed
+
+
+def test_restrictive_child_entry_is_not_overridden_by_parent(tmp_path: Path) -> None:
+    loaded = Scope.load(
+        write_scope(
+            tmp_path,
+            """
+authorized:
+  - domain: parent.example
+    authorization: owner
+  - domain: api.parent.example
+    include_subdomains: false
+    authorization: owner
+""",
+        ),
+    )
+    assert loaded.check("api.parent.example", today=TODAY).allowed
+    decision = loaded.check("v2.api.parent.example", today=TODAY)
+    assert not decision.allowed
+    assert "subdomains of api.parent.example" in decision.reason
+
+
+def test_expired_child_entry_is_not_rescued_by_parent(tmp_path: Path) -> None:
+    loaded = Scope.load(
+        write_scope(
+            tmp_path,
+            """
+authorized:
+  - domain: parent.example
+    authorization: owner
+  - domain: client.parent.example
+    authorization: "engagement ref. 42"
+    expires: 2026-01-31
+""",
+        ),
+    )
+    decision = loaded.check("app.client.parent.example", today=TODAY)
+    assert not decision.allowed
+    assert "expired" in decision.reason
