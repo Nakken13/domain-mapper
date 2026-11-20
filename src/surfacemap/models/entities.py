@@ -21,6 +21,9 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COUNTRY = re.compile(r"^[A-Z]{2}$")
 _MAX_ASN = 2**32 - 1
 
+ID_PREFIXES = frozenset({"domain", "ip", "asn", "cert", "tech", "url"})
+"""Every valid entity id starts with one of these, followed by `:`."""
+
 
 def _normalize_country(value: object) -> object:
     if value is None:

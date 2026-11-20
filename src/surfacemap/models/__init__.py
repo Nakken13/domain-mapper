@@ -10,6 +10,7 @@ from surfacemap.models.entities import (
     IPAddress,
     Technology,
 )
+from surfacemap.models.findings import Finding, Observation, Severity
 from surfacemap.models.relations import Provenance, Relation, RelationType
 
 __all__ = [
@@ -19,9 +20,12 @@ __all__ = [
     "DnsRecord",
     "Domain",
     "Entity",
+    "Finding",
     "IPAddress",
+    "Observation",
     "Provenance",
     "Relation",
     "RelationType",
+    "Severity",
     "Technology",
 ]
