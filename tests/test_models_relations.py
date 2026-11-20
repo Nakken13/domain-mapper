@@ -99,7 +99,16 @@ def test_provenance_query_refuses_more_credential_shapes(query: str) -> None:
         Provenance(source="x", retrieved_at=NOW, query=query)
 
 
-@pytest.mark.parametrize("query", ["monkey=1", "%.example.com", "hostname:example.com"])
+@pytest.mark.parametrize(
+    "query",
+    [
+        "monkey=1",
+        "%.example.com",
+        "hostname:example.com",
+        "bearer.example.com",
+        "authorization.example",
+    ],
+)
 def test_provenance_query_accepts_innocent_text(query: str) -> None:
     assert Provenance(source="x", retrieved_at=NOW, query=query).query == query
 

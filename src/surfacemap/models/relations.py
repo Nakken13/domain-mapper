@@ -9,8 +9,8 @@ from urllib.parse import unquote
 
 from pydantic import Field, field_validator, model_validator
 
-from surfacemap.models.base import FrozenModel, UtcDatetime
-from surfacemap.models.entities import BaseEntity
+from surfacemap.models.base import FrozenModel, NonBlankStr, UtcDatetime
+from surfacemap.models.entities import BaseEntity, id_kind
 
 # Credentials must never reach the cache, the graph or the report. Matched on the
 # URL-decoded query: `name=`/`name:` parameters (also `access_token`, `x_api_key`, …),
@@ -19,7 +19,7 @@ from surfacemap.models.entities import BaseEntity
 _CREDENTIAL = re.compile(
     r"(?<![a-z0-9])(?:[a-z0-9]+[_-])*"
     r"(?:api[_-]?key|key|token|secret|password|passwd|pass|pwd|auth|sig|signature)\s*[=:]"
-    r"|\b(?:authorization|bearer)\b"
+    r"|\bauthorization\s*:|\bbearer\s+\S"
     r"|://[^/@\s]+:[^/@\s]*@",
     re.IGNORECASE,
 )
@@ -51,10 +51,6 @@ ENDPOINTS: dict[RelationType, tuple[str, str]] = {
 }
 
 
-def _kind(entity_id: str) -> str:
-    return entity_id.partition(":")[0]
-
-
 class Relation(FrozenModel):
     """A directed edge `source -[type]-> target`, endpoints given as entity ids.
 
@@ -70,7 +66,7 @@ class Relation(FrozenModel):
     @model_validator(mode="after")
     def _check_endpoints(self) -> Self:
         expected = ENDPOINTS[self.type]
-        actual = (_kind(self.source), _kind(self.target))
+        actual = (id_kind(self.source), id_kind(self.target))
         if actual != expected:
             raise ValueError(
                 f"{self.type} endpoints must be {expected[0]} -> {expected[1]}, "
@@ -97,17 +93,9 @@ class Provenance(FrozenModel):
     `query` describes what was asked (e.g. `%.example.com`), never a URL with credentials.
     """
 
-    source: str = Field(min_length=1)
+    source: NonBlankStr
     retrieved_at: UtcDatetime
     query: str
-
-    @field_validator("source")
-    @classmethod
-    def _source(cls, value: str) -> str:
-        source = value.strip()
-        if not source:
-            raise ValueError("source must not be blank")
-        return source
 
     @field_validator("query")
     @classmethod

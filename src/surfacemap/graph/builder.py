@@ -63,10 +63,7 @@ def merge_entities(left: Entity, right: Entity) -> Entity:
         raise ValueError(f"cannot merge {left.id} with {right.id}")
     if left == right:
         return left
-    merged = {
-        name: _merge_value(name, getattr(left, name), getattr(right, name))
-        for name in type(left).model_fields
-    }
+    merged = {name: _merge_value(name, value, getattr(right, name)) for name, value in left}
     return type(left).model_validate(merged)
 
 
@@ -90,13 +87,12 @@ class SurfaceGraph:
         clean = redact_observation(observation)
         source = clean.provenance.source
         for entity in clean.entities:
-            existing = self._nodes.get(entity.id)
-            if existing is None:
-                self._nodes[entity.id] = Node(entity, frozenset({source}))
-            else:
-                self._nodes[entity.id] = Node(
-                    merge_entities(existing.entity, entity), existing.sources | {source}
-                )
+            node = self._nodes.get(entity.id)
+            self._nodes[entity.id] = (
+                Node(entity, frozenset({source}))
+                if node is None
+                else Node(merge_entities(node.entity, entity), node.sources | {source})
+            )
         for relation in clean.relations:
             edge = self._edges.get(relation.key)
             sources = frozenset({source}) if edge is None else edge.sources | {source}

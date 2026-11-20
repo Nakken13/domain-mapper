@@ -12,30 +12,41 @@ import re
 from abc import ABC, abstractmethod
 from typing import Annotated, Literal, Self
 
-from pydantic import BeforeValidator, Field, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
-from surfacemap.models.base import FrozenModel, UtcDatetime
-from surfacemap.scope import normalize_domain
+from surfacemap.models.base import FrozenModel, NonBlankStr, UtcDatetime
+from surfacemap.scope import InvalidDomainError, normalize_domain
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_COUNTRY = re.compile(r"^[A-Z]{2}$")
 _MAX_ASN = 2**32 - 1
 
 ID_PREFIXES = frozenset({"domain", "ip", "asn", "cert", "tech", "url"})
 """Every valid entity id starts with one of these, followed by `:`."""
 
 
-def _normalize_country(value: object) -> object:
-    if value is None:
-        return None
-    country = str(value).strip().upper()
-    if not _COUNTRY.match(country):
-        raise ValueError(f"{value!r} is not an ISO 3166-1 alpha-2 country code")
-    return country
+def id_kind(entity_id: str) -> str:
+    """The prefix of an entity id (`domain` for `domain:example.com`)."""
+    return entity_id.partition(":")[0]
 
 
-Country = Annotated[str | None, BeforeValidator(_normalize_country)]
+Country = (
+    Annotated[
+        str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Za-z]{2}$")
+    ]
+    | None
+)
 """Optional ISO 3166-1 alpha-2 code, uppercased."""
+
+
+def _normalize_san(raw: str) -> str:
+    """Same IDNA form as `Domain.fqdn`, keeping a `*.` wildcard; other SANs only lowercased."""
+    san = raw.strip().lower().removesuffix(".")
+    wildcard = san.startswith("*.")
+    try:
+        host = normalize_domain(san.removeprefix("*."))
+    except InvalidDomainError:
+        return san  # IP address or email SAN (the latter dropped by privacy.py)
+    return f"*.{host}" if wildcard else host
 
 
 class BaseEntity(FrozenModel, ABC):
@@ -48,13 +59,8 @@ class BaseEntity(FrozenModel, ABC):
 class DnsRecord(FrozenModel):
     """A raw DNS record kept on a domain (TXT, CAA, …), not modeled as a relation."""
 
-    type: str = Field(min_length=1)
+    type: Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, min_length=1)]
     value: str
-
-    @field_validator("type")
-    @classmethod
-    def _upper(cls, value: str) -> str:
-        return value.strip().upper()
 
 
 class Domain(BaseEntity):
@@ -125,7 +131,7 @@ class Certificate(BaseEntity):
     @field_validator("sans")
     @classmethod
     def _lower_sans(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        return tuple(san.strip().lower().removesuffix(".") for san in value)
+        return tuple(_normalize_san(san) for san in value)
 
     @model_validator(mode="after")
     def _ordered(self) -> Self:
@@ -140,17 +146,9 @@ class Certificate(BaseEntity):
 
 class Technology(BaseEntity):
     kind: Literal["technology"] = "technology"
-    name: str
+    name: NonBlankStr
     category: str
     evidence: tuple[str, ...] = ()
-
-    @field_validator("name")
-    @classmethod
-    def _name(cls, value: str) -> str:
-        name = value.strip()
-        if not name:
-            raise ValueError("technology name must not be blank")
-        return name
 
     @field_validator("evidence", mode="before")
     @classmethod

@@ -126,9 +126,9 @@ def _scrub(value: Any) -> Any:
 
 
 def _scrub_model(model: _M) -> _M:
-    fields = {name: getattr(model, name) for name in type(model).model_fields}
+    fields = dict(model)
     if isinstance(model, Certificate):
-        fields["sans"] = drop_email_sans(tuple(fields["sans"]))
+        fields["sans"] = drop_email_sans(fields["sans"])
     return type(model).model_validate({name: _scrub(value) for name, value in fields.items()})
 
 

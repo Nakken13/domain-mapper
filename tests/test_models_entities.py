@@ -153,3 +153,20 @@ def test_technology_name_is_stripped_and_blank_refused() -> None:
 def test_technology_evidence_is_a_tuple() -> None:
     tech = Technology(name="nginx", category="web-server", evidence=["Server header"])
     assert tech.evidence == ("Server header",)
+
+
+def test_dns_record_type_must_not_be_blank() -> None:
+    with pytest.raises(ValidationError):
+        DnsRecord(type="  ", value="x")
+
+
+def test_certificate_sans_use_the_same_idna_form_as_domains() -> None:
+    cert = Certificate(
+        sha256=SHA,
+        issuer="R3",
+        not_before=T0,
+        not_after=T1,
+        sans=["Café.example.", "*.Café.example", "192.0.2.1"],
+    )
+    fqdn = Domain(fqdn="café.example", in_scope=True).fqdn
+    assert cert.sans == (fqdn, f"*.{fqdn}", "192.0.2.1")
