@@ -32,8 +32,12 @@ REDACTED_EMAIL = "[redacted-email]"
 
 # Unicode-aware and fail-closed: any non-separator run, `@` or its URL-encoded form `%40`,
 # then a dotted domain. Separators keep the surrounding text (`mailto:`, `/path/`, `rua=`).
+# Lengths are capped at the RFC 5321 limits (local part 64, domain 253): unbounded runs
+# made the backtracking quadratic, minutes on a 60 kB TXT record or archived path.
 _SEP = r"\s@<>\"'(),;:\[\]/=?&#"
-_EMAIL = re.compile(rf"[^{_SEP}]+(?:@|%40)[^{_SEP}%]+\.[^{_SEP}%.]{{2,}}", re.IGNORECASE)
+_EMAIL = re.compile(
+    rf"[^{_SEP}]{{1,64}}(?:@|%40)[^{_SEP}%]{{1,253}}\.[^{_SEP}%.]{{2,63}}", re.IGNORECASE
+)
 
 # Allowed keys, normalized (lowercase, spaces/hyphens -> "_"). `None` = scalar or list of
 # scalars kept (strings email-scrubbed); a dict = nested object(s) filtered recursively.

@@ -242,3 +242,12 @@ def test_unexpected_shapes_are_dropped_not_kept() -> None:
         "status": ["active"],
         "nameservers": [{"ldhName": "ns2.example.net"}],
     }
+
+
+def test_scrub_emails_stays_linear_on_long_unseparated_input() -> None:
+    import time
+
+    text = "a%4" * 20_000  # no separator, no real address: worst case for backtracking
+    start = time.perf_counter()
+    assert scrub_emails(text) == text
+    assert time.perf_counter() - start < 1.0
