@@ -15,5 +15,5 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(models): Relation (HAS_SUBDOMAIN, RESOLVES_TO, CNAME_TO, MX, NS, ANNOUNCED_BY, SECURED_BY, USES_TECH, ARCHIVED_AT) + Provenance(source, retrieved_at, query)
 - [x] feat(models): Observation and Finding (rule_id, Severity, title, rationale, evidence ids, remediation)
 - [x] feat(privacy): redaction filters (drop WHOIS/RDAP contacts, drop cert SANs containing '@', strip URL query strings)
-- [ ] feat(graph): merge observations into a deduplicated graph, sources unioned per node (feeds the Venn diagram)
+- [x] feat(graph): merge observations into a deduplicated graph, sources unioned per node (feeds the Venn diagram)
 - [ ] Review + merge branch into main
