@@ -52,3 +52,18 @@ Passive means third-party public data only; nothing is ever sent to the target.
 
 Coverage is a lower bound: hosts with no certificate, archive entry or reachable DNS name are
 invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sources.md).
+
+## Methodology
+
+1. **Scope check**: the domain must be in `scope.yaml`, else the run is refused before any network object exists.
+2. **Collect**: an async engine fans out over the plugins, behind one HTTP client (per-source rate limit,
+   SQLite cache, redirects never followed, never a request to the target).
+3. **Filter**: `privacy.py` strips personal data before anything is cached or merged.
+4. **Merge**: observations carry their provenance into one graph, so each claim is traceable to a source.
+5. **Analyse**: graph metrics (degree, betweenness, articulation points = single points of dependency) and
+   explainable risk rules (`rationale`, `evidence`, `remediation`; takeover is a DNS-only lead).
+6. **Evaluate**: compared with Amass and Subfinder (passive) with recall relative to the union of tools and
+   failed runs reported as `n/a`. On the one tested domain the surface is a single host, so the benchmark
+   does not discriminate: see [docs/evaluation.md](docs/evaluation.md).
+
+More: [docs/methodology.md](docs/methodology.md).
