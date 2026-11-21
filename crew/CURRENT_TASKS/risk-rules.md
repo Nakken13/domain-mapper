@@ -15,6 +15,6 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(risk): takeover rule (PASSIVE only: CNAME to a known risky provider listed in `src/surfacemap/risk/data/takeover_providers.yaml` + NXDOMAIN on the CNAME target, no HTTP fingerprint)
 - [x] feat(risk): missing/weak DMARC and SPF rule
 - [x] feat(risk): expired / soon-expiring certificates rule
-- [ ] feat(risk): exposed dev/staging/test subdomains rule
+- [x] feat(risk): exposed dev/staging/test subdomains rule
 - [ ] feat(risk): multiple hosting providers rule
 - [ ] Review + merge branch into main
