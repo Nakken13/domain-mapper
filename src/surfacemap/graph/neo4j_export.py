@@ -2,8 +2,9 @@
 
 The `neo4j` driver is an optional extra (`pip install surfacemap[neo4j]`): this module never
 imports it, the caller builds the driver and passes it in, so the export stays testable
-with a fake. Labels and relationship types come from a closed set (entity id prefixes and the
-`RelationType` enum) and are validated; every value travels as a query parameter.
+with a fake. Labels come from the closed id-prefix table in `_common`, relationship types
+from the `RelationType` enum; both are validated and every value travels as a query
+parameter. Re-exporting is exact: `SET n = $props` drops properties that no longer exist.
 """
 
 from __future__ import annotations
@@ -12,19 +13,11 @@ import json
 import re
 from typing import Any, Protocol
 
+from surfacemap.graph._common import label_of, node_ids, node_props, sorted_edge_keys
 from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models.entities import id_kind
 
 Statement = tuple[str, dict[str, Any]]
 
-_LABELS = {
-    "domain": "Domain",
-    "ip": "IP",
-    "asn": "ASN",
-    "cert": "Certificate",
-    "tech": "Technology",
-    "url": "ArchivedUrl",
-}
 _SAFE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 
@@ -32,10 +25,6 @@ def _label(name: str) -> str:
     if not _SAFE.match(name):
         raise ValueError(f"unsafe Cypher identifier: {name!r}")
     return name
-
-
-def _node_label(node_id: str) -> str:
-    return _label(_LABELS.get(id_kind(node_id), id_kind(node_id).capitalize()))
 
 
 def _prop(value: Any) -> Any:
@@ -48,34 +37,27 @@ def _prop(value: Any) -> Any:
 
 
 def cypher_statements(graph: SurfaceGraph) -> list[Statement]:
-    """Constraints, then nodes (sorted by id), then edges (sorted by key). Idempotent MERGEs."""
-    ids = set(graph.nodes)
-    for source, _, target in graph.edges:
-        ids.update((source, target))
-    labels = sorted({_node_label(i) for i in ids})
+    """Constraints, then nodes (sorted by id), then edges (sorted by key). Idempotent."""
+    ids = node_ids(graph)
     statements: list[Statement] = [
         (f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.id IS UNIQUE", {})
-        for label in labels
+        for label in sorted({_label(label_of(i)) for i in ids})
     ]
-    for node_id in sorted(ids):
-        node = graph.nodes.get(node_id)
-        props: dict[str, Any] = {"sources": []}
-        if node is not None:
-            dumped = node.entity.model_dump(mode="json", exclude_none=True)
-            dumped.pop("id", None)
-            props = {k: _prop(v) for k, v in dumped.items()}
-            props["sources"] = sorted(node.sources)
+    for node_id in ids:
+        props = {k: _prop(v) for k, v in node_props(graph, node_id).items()}
+        props["id"] = node_id
         statements.append(
             (
-                f"MERGE (n:{_node_label(node_id)} {{id: $id}}) SET n += $props",
+                f"MERGE (n:{_label(label_of(node_id))} {{id: $id}}) SET n = $props",
                 {"id": node_id, "props": props},
             )
         )
-    for key in sorted(graph.edges, key=lambda k: (k[0], str(k[1]), k[2])):
+    for key in sorted_edge_keys(graph):
         source, rel_type, target = key
         statements.append(
             (
-                "MATCH (a {id: $source}), (b {id: $target}) "
+                f"MATCH (a:{_label(label_of(source))} {{id: $source}}), "
+                f"(b:{_label(label_of(target))} {{id: $target}}) "
                 f"MERGE (a)-[r:{_label(str(rel_type))}]->(b) SET r.sources = $sources",
                 {
                     "source": source,

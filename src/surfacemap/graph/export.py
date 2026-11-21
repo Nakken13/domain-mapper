@@ -12,29 +12,16 @@ from typing import Any
 
 import networkx as nx
 
+from surfacemap.graph._common import node_ids, node_props, sorted_edge_keys
 from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models.entities import id_kind
-
-
-def _node_attrs(graph: SurfaceGraph, node_id: str) -> dict[str, Any]:
-    node = graph.nodes.get(node_id)
-    if node is None:  # edge endpoint emitted by another observation: keep it, minimal
-        return {"kind": id_kind(node_id), "sources": []}
-    attrs = node.entity.model_dump(mode="json", exclude_none=True)
-    attrs.pop("id", None)
-    attrs["sources"] = sorted(node.sources)
-    return attrs
 
 
 def to_networkx(graph: SurfaceGraph) -> nx.MultiDiGraph:
     """Directed multigraph; edge key = relation type, so parallel typed edges coexist."""
     g = nx.MultiDiGraph()
-    ids = set(graph.nodes)
-    for source, _, target in graph.edges:
-        ids.update((source, target))
-    for node_id in sorted(ids):
-        g.add_node(node_id, **_node_attrs(graph, node_id))
-    for key in sorted(graph.edges, key=lambda k: (k[0], str(k[1]), k[2])):
+    for node_id in node_ids(graph):
+        g.add_node(node_id, **node_props(graph, node_id))
+    for key in sorted_edge_keys(graph):
         source, rel_type, target = key
         g.add_edge(source, target, key=str(rel_type), sources=sorted(graph.edges[key].sources))
     return g

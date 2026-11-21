@@ -32,7 +32,7 @@ def compute_metrics(graph: SurfaceGraph) -> dict[str, NodeMetrics]:
     cut_points = set(nx.articulation_points(simple))
     return {
         node: NodeMetrics(
-            degree=g.degree(node),
+            degree=simple.degree(node),
             betweenness=betweenness[node],
             articulation=node in cut_points,
         )
