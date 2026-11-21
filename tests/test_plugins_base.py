@@ -168,3 +168,21 @@ def test_default_registry_is_fresh_each_call() -> None:
 def test_ip_entities_are_not_domains_for_applies_to() -> None:
     entity = IPAddress(address="192.0.2.1")
     assert Dummy().applies_to(entity, scope_view())
+
+
+def test_scope_view_require_uses_the_pinned_date() -> None:
+    from surfacemap.scope import OutOfScopeError
+
+    view = scope_view()
+    assert view.require("WWW.Example.com.") == "www.example.com"
+    with pytest.raises(OutOfScopeError):
+        view.require("old.org")  # expired on the pinned date, whatever today is
+
+
+@pytest.mark.parametrize(
+    "host", ["straße.example", "www.xn--strae-oqa.example", "strasse.example", "STRASSE.example"]
+)
+def test_target_host_matches_every_idna_spelling(host: str) -> None:
+    # IDNA 2003 (Python codec, used by scope) maps ß to ss; IDNA 2008 (httpx) keeps it.
+    view = ScopeView(Scope([ScopeEntry(domain="straße.example", authorization="x")]), TODAY)
+    assert view.is_target_host(host)

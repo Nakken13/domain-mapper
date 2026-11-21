@@ -198,11 +198,20 @@ async def test_idn_target_is_refused_whatever_its_spelling(tmp_path: Path) -> No
     from surfacemap.plugins.base import ScopeView
     from surfacemap.scope import Scope, ScopeEntry
 
-    view = ScopeView(Scope([ScopeEntry(domain="bücher.example", authorization="x")]), date.today())
+    entries = [
+        ScopeEntry(domain="bücher.example", authorization="x"),
+        ScopeEntry(domain="straße.example", authorization="x"),
+    ]
+    view = ScopeView(Scope(entries), date.today())
     route = respx.get(url__regex=r".*").respond(200)
     with ResponseCache(tmp_path / "idn.sqlite", ttl=timedelta(hours=1)) as cache:
         client = HttpClient(RateLimiter({}), cache, view.is_target_host)
-        for url in ("https://www.bücher.example/", "https://www.xn--bcher-kva.example/"):
+        for url in (
+            "https://www.bücher.example/",
+            "https://www.xn--bcher-kva.example/",
+            "https://straße.example/",
+            "https://xn--strae-oqa.example/",  # IDNA 2008 spelling of straße
+        ):
             with pytest.raises(PassiveViolationError):
                 await client.get_text("crtsh", url, query="q")
         await client.aclose()

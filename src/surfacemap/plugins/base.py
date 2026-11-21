@@ -16,11 +16,14 @@ Scope policy is declared, not inferred:
 
 from __future__ import annotations
 
+import contextlib
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from typing import Protocol, TypeVar, get_args, runtime_checkable
+
+import idna
 
 from surfacemap.collect.cache import ResponseCache
 from surfacemap.collect.http import HttpClient
@@ -64,17 +67,41 @@ class ScopeView:
         decision = self._scope.check(fqdn, today=self.today)
         return decision.entry.domain if decision.allowed and decision.entry else None
 
+    def require(self, raw_domain: str) -> str:
+        """Normalized domain, or OutOfScopeError, judged on the pinned date."""
+        return self._scope.require(raw_domain, today=self.today)
+
     def is_target_host(self, host: str) -> bool:
         """True for any name under a listed domain, even expired or restricted (fail closed).
 
         Used to refuse direct HTTP traffic to the target: passive means never contacting it.
+        Every spelling is tried, because scope names are normalized with Python's IDNA 2003
+        codec (`ß` -> `ss`) while httpx sends IDNA 2008 (`ß` -> `xn--zca`).
         """
-        try:
-            name = normalize_domain(host)
-        except InvalidDomainError:
-            # e.g. `_dmarc.example.com`: not a valid hostname for scope, still the target.
-            name = host.strip().lower().removesuffix(".")
-        return any(name == e.domain or name.endswith("." + e.domain) for e in self._scope.entries)
+        return any(
+            name == e.domain or name.endswith("." + e.domain)
+            for name in _spellings(host)
+            for e in self._scope.entries
+        )
+
+
+def _spellings(host: str) -> set[str]:
+    raw = host.strip().lower().removesuffix(".")
+    names = {raw}
+    for candidate in (raw, _punycode_decoded(raw)):
+        # e.g. `_dmarc.example.com` is refused by both: the raw spelling still matches.
+        with contextlib.suppress(InvalidDomainError):
+            names.add(normalize_domain(candidate))
+        with contextlib.suppress(idna.IDNAError):
+            names.add(idna.encode(candidate, uts46=True).decode("ascii"))
+    return names
+
+
+def _punycode_decoded(name: str) -> str:
+    try:
+        return idna.decode(name)
+    except idna.IDNAError:
+        return name
 
 
 @dataclass(frozen=True)
