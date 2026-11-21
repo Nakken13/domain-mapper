@@ -15,7 +15,7 @@ Zone: `src/surfacemap/risk/`, `tests/`
 
 Zone: `src/surfacemap/graph/` (except `src/surfacemap/graph/builder.py`), `docker-compose.yml`, `tests/`
 
-- `graph-export.md`
+- ~~`graph-export.md`~~
 
 ## Batch F
 
