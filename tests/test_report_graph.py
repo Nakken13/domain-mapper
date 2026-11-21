@@ -47,6 +47,23 @@ def test_elements_flag_nodes_outside_the_scope() -> None:
     assert nodes["domain:out.other.net"]["in_scope"] is False
 
 
+def test_every_entity_kind_has_a_distinct_colour() -> None:
+    """A kind without a colour would silently render grey (it happened once)."""
+    from surfacemap.graph._common import _BY_PREFIX
+    from surfacemap.report.graphdata import KIND_COLORS
+
+    kinds = {kind for kind, _label in _BY_PREFIX.values()}
+    assert set(KIND_COLORS) == kinds
+    assert len(set(KIND_COLORS.values())) == len(kinds)
+
+
+def test_elements_carry_the_colour_of_their_kind() -> None:
+    from surfacemap.report.graphdata import KIND_COLORS
+
+    nodes = {n["id"]: n for n in graph_elements(_graph())["nodes"]}
+    assert nodes["domain:app.example.com"]["color"] == KIND_COLORS["domain"]
+
+
 def test_script_json_cannot_close_the_script_block() -> None:
     payload = to_script_json({"label": "</script><img src=x onerror=alert(1)>", "x": "<!--"})
     assert "</" not in payload

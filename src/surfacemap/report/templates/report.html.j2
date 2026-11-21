@@ -61,7 +61,6 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
 <script>
 (function () {
   var data = JSON.parse(document.getElementById("graph-data").textContent);
-  var colors = { domain: "#2f81f7", ip: "#3fb950", asn: "#a371f7", certificate: "#d29922", technology: "#db61a2", archived_url: "#8b949e" };
   var elements = [];
   data.nodes.forEach(function (n) { elements.push({ data: n }); });
   data.edges.forEach(function (e, i) {
@@ -74,7 +73,7 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
     style: [
       { selector: "node", style: {
         "label": "data(label)", "font-size": 10, "color": "#8b949e", "text-valign": "bottom", "text-margin-y": 4,
-        "background-color": function (n) { return colors[n.data("kind")] || "#8b949e"; },
+        "background-color": "data(color)",
         "border-width": 2, "border-color": "#0d1117" } },
       { selector: "node[?out_of_scope]", style: { "border-style": "dashed", "border-color": "#f85149" } },
       { selector: "edge", style: { "width": 1, "line-color": "#8b949e", "target-arrow-color": "#8b949e",

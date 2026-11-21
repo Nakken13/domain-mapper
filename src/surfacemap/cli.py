@@ -97,7 +97,7 @@ async def _collect(domain: str, scope: Scope, settings: Settings, today: date) -
     """Run the passive plugins from `domain`. Opened only after the scope check passed."""
     view = ScopeView(scope, today)
     with ResponseCache(settings.cache_dir / "cache.sqlite", ttl=CACHE_TTL) as cache:
-        limiter = RateLimiter({})
+        limiter = RateLimiter({})  # no per-source override: every source uses DEFAULT_LIMIT
         http = HttpClient(limiter, cache, view.is_target_host)
         try:
             ctx = PluginContext(

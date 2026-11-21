@@ -9,6 +9,17 @@ from surfacemap.graph._common import kind_of, node_ids, node_props, sorted_edge_
 from surfacemap.graph.builder import SurfaceGraph
 from surfacemap.models.entities import id_kind
 
+# One colour per entity kind (the values `kind_of` returns). Presentation, so it lives here and
+# not in graph/_common; a missing kind raises KeyError below instead of rendering grey.
+KIND_COLORS: dict[str, str] = {
+    "domain": "#2f81f7",
+    "ip": "#3fb950",
+    "asn": "#a371f7",
+    "certificate": "#d29922",
+    "technology": "#db61a2",
+    "archived_url": "#8b949e",
+}
+
 
 def _label(node_id: str) -> str:
     return node_id.partition(":")[2]
@@ -26,6 +37,7 @@ def graph_elements(graph: SurfaceGraph) -> dict[str, list[dict[str, Any]]]:
                 "id": node_id,
                 "label": _label(node_id),
                 "kind": kind_of(node_id),
+                "color": KIND_COLORS[kind_of(node_id)],
                 # Only domains carry a scope flag; an undescribed endpoint is not authorized.
                 "in_scope": in_scope,
                 # Drawn dashed. Only a domain can be outside the scope: an IP or an ASN has none.
