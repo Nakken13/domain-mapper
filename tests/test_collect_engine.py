@@ -348,3 +348,50 @@ async def test_non_observation_results_are_dropped(
     graph = await Engine([weird], ctx).run("example.com")
     assert list(graph.nodes) == ["domain:example.com"]
     assert "weird" in caplog.text
+
+
+async def test_entity_whose_id_changes_under_redaction_does_not_crash_the_run(
+    ctx: PluginContext,
+) -> None:
+    from surfacemap.models import ArchivedURL
+
+    url = ArchivedURL(
+        host="www.example.com", path="/u/john.doe@example.org", first_seen=NOW, last_seen=NOW
+    )
+    wayback = Fake("wayback", {"domain"}, table("wayback", {"domain:example.com": [url]}))
+    reader = Fake("reader", {"archived_url"}, lambda e: [])
+    graph = await Engine([wayback, reader], ctx).run("example.com")
+    (url_id,) = [i for i in graph.nodes if i.startswith("url:")]
+    assert "john.doe" not in url_id
+    assert reader.calls == [url_id]  # scheduled on the redacted entity
+
+
+async def test_out_of_scope_subject_only_expands_its_cname_chain(ctx: PluginContext) -> None:
+    edge, ns, back = (
+        dom("edge.cdn.net", False),
+        dom("ns1.cdnprovider.net", False),
+        dom("b.example.com"),
+    )
+    dns = Fake(
+        "dns",
+        {"domain"},
+        table(
+            "dns",
+            {
+                "domain:example.com": [CDN],
+                CDN.id: [
+                    edge,
+                    ns,
+                    back,
+                    Relation.between(CDN, RelationType.CNAME_TO, edge),
+                    Relation.between(CDN, RelationType.NS, ns),
+                ],
+            },
+        ),
+        runs_out_of_scope=True,
+    )
+    graph = await Engine([dns], ctx).run("example.com")
+    assert ns.id in graph.nodes  # recorded
+    assert edge.id in dns.calls  # the CNAME chain is followed down to its IPs
+    assert ns.id not in dns.calls  # third-party infrastructure is not crawled
+    assert back.id in dns.calls  # the scope, not the path, decides for target names

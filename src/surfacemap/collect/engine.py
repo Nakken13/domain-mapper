@@ -16,7 +16,9 @@ enriched further"):
   behind an out-of-scope CDN CNAME is RESOLVE_ONLY and gets no ASN lookup;
 * reach only goes up (an in-scope path reaching that IP later upgrades it, and the
   plugins it missed run in the next wave), so the loop terminates;
-* RESOLVE_ONLY entities only see plugins declaring `runs_out_of_scope=True`.
+* RESOLVE_ONLY entities only see plugins declaring `runs_out_of_scope=True`, and what
+  they produce is only expanded along their CNAME chain (or when the scope authorizes
+  it): a CDN's NS/MX hosts are recorded, not crawled hop after hop.
 
 The engine, not the plugin, stamps `Domain.in_scope` before merging: the builder makes
 `False` win, so a wrong plugin flag would otherwise stick. The next wave reads entities
@@ -44,6 +46,7 @@ from enum import IntEnum
 from surfacemap.graph.builder import SurfaceGraph
 from surfacemap.models import Domain, Entity, Observation, Provenance, Relation, RelationType
 from surfacemap.plugins.base import Plugin, PluginContext
+from surfacemap.privacy import redact_observation
 
 ENGINE_SOURCE = "surfacemap"
 
@@ -113,7 +116,7 @@ class Engine:
             frontier = set()
             for (plugin, entity), observations in zip(items, results, strict=True):
                 for observation in observations:
-                    frontier |= self._absorb(graph, reach, plugin, reach[entity.id], observation)
+                    frontier |= self._absorb(graph, reach, plugin, entity, observation)
         else:
             if frontier:
                 logger.info("max depth reached with %d entities left", len(frontier))
@@ -159,10 +162,10 @@ class Engine:
         graph: SurfaceGraph,
         reach: dict[str, Reach],
         plugin: Plugin,
-        subject_reach: Reach,
+        subject: Entity,
         observation: object,
     ) -> set[str]:
-        """Merge one observation; return the ids whose reach was created or raised."""
+        """Merge one observation; return the ids to expand in the next wave."""
         if not isinstance(observation, Observation):
             logger.warning("plugin %s returned a non-Observation: dropped", plugin.name)
             return set()
@@ -173,21 +176,35 @@ class Engine:
             )
             return set()
 
-        stamped = observation.model_copy(
-            update={"entities": tuple(self._stamp(e) for e in observation.entities)}
+        # Redact here (merge redacts again, idempotently): redaction can change an id
+        # (an email scrubbed from a URL path), and the next wave must use graph ids.
+        clean = redact_observation(
+            observation.model_copy(
+                update={"entities": tuple(self._stamp(e) for e in observation.entities)}
+            )
         )
-        graph.merge(stamped)
+        graph.merge(clean)
 
-        raised = set()
-        for entity in stamped.entities:
+        subject_reach = reach[subject.id]
+        cname_targets = {
+            r.target
+            for r in clean.relations
+            if r.type is RelationType.CNAME_TO and r.source == subject.id
+        }
+        expand = set()
+        for entity in clean.entities:
             if isinstance(entity, Domain):
                 level = Reach.FULL if entity.in_scope else Reach.RESOLVE_ONLY
             else:
                 level = subject_reach
-            if level > reach.get(entity.id, 0):
-                reach[entity.id] = level
-                raised.add(entity.id)
-        return raised
+            if level <= reach.get(entity.id, 0):
+                continue
+            reach[entity.id] = level
+            # An out-of-scope subject only leads on along its CNAME chain (to reach the
+            # IPs) or to names the scope authorizes: the rest is recorded, not crawled.
+            if subject_reach is Reach.FULL or level is Reach.FULL or entity.id in cname_targets:
+                expand.add(entity.id)
+        return expand
 
     def _stamp(self, entity: Entity) -> Entity:
         if isinstance(entity, Domain):
