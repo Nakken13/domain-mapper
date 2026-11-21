@@ -13,7 +13,7 @@ subdomains; the only traffic it generates is listed below (each plugin states it
 | iptoasn `ip2country` | `geoip` | none (local file) | country of an IP | The user downloads the dataset. Country level only; a CDN IP is geolocated to the CDN, not the origin. |
 | Wayback Machine CDX | `wayback` | HTTPS to `web.archive.org` | archived paths | Query strings, fragments and session parameters are stripped (tokens, emails). Only what the Archive crawled. The service is sometimes unavailable (503). |
 | Shodan (optional) | `shodan` | HTTPS to `api.shodan.io` | open ports/banners already scanned by Shodan | Off without an API key. Data is Shodan's: credit it, stay within your plan's terms. Banners are reduced before caching (they can carry personal data). |
-| Google dorks | `dorks` | none | search links for the user | Never executed: Google forbids automated queries. Output does not enter the graph. SPF/DMARC parsing (`mailauth`) is also offline: pure functions over collected TXT. |
+| Google dorks | `dorks` | none | search links for the user | A helper function: the CLI and the report do not expose it yet. Never executed: Google forbids automated queries. Output does not enter the graph. SPF/DMARC parsing (`mailauth`) is also offline: pure functions over collected TXT. |
 
 ## What passive cannot see
 

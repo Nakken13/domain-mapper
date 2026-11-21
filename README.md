@@ -8,11 +8,15 @@ Passive attack-surface mapping of a domain you own or are authorized to assess, 
 
 ```bash
 py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .venv
-.venv/Scripts/python -m pip install -e ".[dev]"
-cp scope.example.yaml scope.yaml            # list the domains you are authorized to assess
-.venv/Scripts/surfacemap scope check example.com
-.venv/Scripts/surfacemap scan example.com -o example.com-report.html
+.venv/Scripts/activate                      # Linux/macOS: source .venv/bin/activate
+python -m pip install -e ".[dev]"
+cp scope.example.yaml scope.yaml            # list ONLY domains you are authorized to assess
+surfacemap scope check example.com
+surfacemap scan example.com -o example.com-report.html   # needs network access to the public sources
 ```
+
+Edit `scope.yaml` first: `example.com` is a placeholder, and entries can carry an `expires` date after
+which the domain is refused.
 
 The report is a single self-contained HTML file (Cytoscape.js inlined): open it offline.
 
@@ -20,8 +24,9 @@ The report is a single self-contained HTML file (Cytoscape.js inlined): open it 
 
 ![Report demo: surface graph, then risk findings](media/surfacemap-demo.gif)
 
-*Illustrative only: a fictional `example.com` surface (documentation IP ranges), not a real scan,
-because the only authorized real target has a single host. Regenerate it with
+*Illustrative only: a fictional `example.com` surface (documentation IP ranges) with expiring certificates,
+a staging host and a dangling CNAME to an out-of-scope CDN. It is not a real scan, because the only authorized
+real target has a single host. Regenerate it with
 `python media/make_demo_report.py demo.html`.*
 
 ## Architecture
@@ -33,16 +38,15 @@ flowchart LR
     engine --> plugins["plugins/<br/>one passive source per module"]
     plugins -->|Observation| priv["privacy.py<br/>personal-data filters"]
     priv --> builder["graph/builder<br/>merge into SurfaceGraph"]
-    builder --> metrics["graph/metrics<br/>degree, betweenness,<br/>articulation points"]
     builder --> rules["risk/<br/>one explainable rule per file"]
-    metrics --> report["report/<br/>self-contained HTML"]
+    builder --> report["report/<br/>self-contained HTML"]
     rules -->|Finding| report
-    builder -.->|optional| neo4j[("Neo4j export")]
 ```
 
 Plugins never touch the graph: they return `Observation` objects and only `graph/builder.py`
 merges them. Every entry point goes through the scope guard first, and everything a plugin emits
-passes through `privacy.py` before entering the graph. Details: [docs/architecture.md](docs/architecture.md).
+passes through `privacy.py` before entering the graph. Graph metrics (`graph/metrics.py`) and a Neo4j
+export exist as library modules but are not wired into `surfacemap scan` yet. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Sources and their limits
 
@@ -56,7 +60,7 @@ Passive means third-party public data only; nothing is ever sent to the target.
 | Team Cymru, iptoasn (local) | ASN, holder, country | country level; a CDN IP says nothing about the origin |
 | Wayback CDX | archived paths | only what the Archive crawled; query strings stripped |
 | Shodan (optional, key) | ports/banners already scanned | off without a key; data stays Shodan's |
-| Google dorks | links to open by hand | never run automatically |
+| Google dorks | links to open by hand | helper function only: not exposed by the CLI or the report, never run automatically |
 
 Coverage is a lower bound: hosts with no certificate, archive entry or reachable DNS name are
 invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sources.md).
@@ -64,12 +68,14 @@ invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sour
 ## Methodology
 
 1. **Scope check**: the domain must be in `scope.yaml`, else the run is refused before any network object exists.
-2. **Collect**: an async engine fans out over the plugins, behind one HTTP client (per-source rate limit,
-   SQLite cache, redirects never followed, never a request to the target).
+2. **Collect**: an async engine fans out over the plugins, behind one HTTP client (per-source token bucket,
+   default 1 request/s; SQLite cache; redirects never followed; a request to the target or its subdomains
+   raises `PassiveViolationError`). DNS, ASN and WHOIS traffic goes through its own clients, each limited to
+   the third-party services listed above.
 3. **Filter**: `privacy.py` strips personal data before anything is cached or merged.
 4. **Merge**: observations carry their provenance into one graph, so each claim is traceable to a source.
-5. **Analyse**: graph metrics (degree, betweenness, articulation points = single points of dependency) and
-   explainable risk rules (`rationale`, `evidence`, `remediation`; takeover is a DNS-only lead).
+5. **Analyse**: explainable risk rules (`rationale`, `evidence`, `remediation`; takeover is a DNS-only lead).
+   Graph metrics (degree, betweenness, articulation points) are implemented but not yet shown in the report.
 6. **Evaluate**: compared with Amass and Subfinder (passive) with recall relative to the union of tools and
    failed runs reported as `n/a`. On the one tested domain the surface is a single host, so the benchmark
    does not discriminate: see [docs/evaluation.md](docs/evaluation.md).
@@ -78,7 +84,8 @@ More: [docs/methodology.md](docs/methodology.md).
 
 ## Ethics & legal
 
-- **Authorization first.** Only map domains you own or hold written permission to assess. In France,
+- **Authorization first.** Being passive does not grant authorization, and `scope.yaml` is a self-declared
+  control, not proof of it. Only map domains you own or hold written permission to assess. In France,
   fraudulently accessing or remaining in an automated data processing system is an offence under
   **Code pénal art. 323-1** (up to three years' imprisonment and a EUR 100,000 fine at the time of
   writing; check [Légifrance](https://www.legifrance.gouv.fr/) for the current text). Probing a
@@ -86,13 +93,13 @@ More: [docs/methodology.md](docs/methodology.md).
 - **Enforced, not just advised.** `scope.yaml` lists authorized domains with an optional expiry;
   every entry point goes through `scope.py`, and an out-of-scope domain is refused before any
   network object is created.
-- **Passive by construction.** No port scan, no bruteforce, no HTTP request to the target or its
+- **Passive by design.** No port scan, no bruteforce, no HTTP request to the target or its
   subdomains (the HTTP client raises `PassiveViolationError`). Out-of-scope names met on the way, such
   as a CDN CNAME target, are recorded and DNS-resolved, never enriched.
 - **No personal data.** Registrant contacts, emails and individual names are filtered out before the
   cache and the graph (`privacy.py`).
 - **Third-party terms.** Shodan data stays Shodan's (credit it, respect your plan); Google dorks are
-  generated as links and never run automatically; crt.sh, Team Cymru and WHOIS servers are rate-limited.
+  generated as links and never run automatically; crt.sh, Team Cymru and WHOIS servers are rate-limited on the client side.
 - **Findings are leads.** A takeover finding is inferred from DNS only; verify and report responsibly
   to the domain owner. This section is engineering context, not legal advice.
 
@@ -112,5 +119,7 @@ Each one answers a limit documented above.
   signal for continuous monitoring.
 - **More risk rules**: dangling NS delegations, expiring certificates across a whole estate, CAA
   records, MTA-STS/TLS-RPT.
+- **Wire in what exists**: show graph metrics (articulation points first) in the report and expose the
+  Neo4j export and the dorks links from the CLI.
 - **Optional active mode, strictly opt-in**: confirming a takeover with one request would help, but it
   breaks the passive invariant, so it would need an explicit scope flag and its own legal review.

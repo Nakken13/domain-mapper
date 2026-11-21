@@ -1,12 +1,12 @@
 """Build the FICTIONAL demo report used for the README GIF.
 
 Not a scan: every name is under example.com (RFC 2606) and every address in a documentation
-range (RFC 5737), so nothing here describes a real system. The graph shows what the report does
-with shared infrastructure (hubs, articulation points) and which risk rules fire.
+range (RFC 5737), so nothing here describes a real system. The graph shows what the report
+draws (shared IPs, a certificate, an out-of-scope CDN node) and which risk rules fire.
 
 Traffic: none.
 
-    python media/make_demo_report.py media/demo-report.html
+    python media/make_demo_report.py demo.html   # write it outside media/ or do not commit it
 """
 
 from __future__ import annotations
@@ -106,4 +106,6 @@ def main(out: Path) -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("usage: python media/make_demo_report.py OUTPUT.html")
     main(Path(sys.argv[1]))

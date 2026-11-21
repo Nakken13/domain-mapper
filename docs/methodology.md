@@ -6,7 +6,7 @@
    refused before any object that could touch the network exists.
 2. **Fan-out.** The async engine calls each plugin once per entity whose kind it consumes, starting
    from the scope root. Newly seen names feed the next round. Every outbound call goes through one
-   HTTP client: rate limit per source, SQLite response cache, no redirects followed, no request to the
+   HTTP client: per-source token bucket (default 1 request/s), SQLite response cache, no redirects followed, no request to the
    target or its subdomains (a `PassiveViolationError` is raised instead).
 3. **Privacy filter.** Plugin output is reduced by `privacy.py` (allow-lists for registration data,
    query strings stripped, no names or emails) before it enters the graph or the cache.
@@ -16,9 +16,10 @@
 
 ## Analysis
 
-- **Graph metrics** (undirected view): degree (hubs), betweenness (where connections are routed),
-  articulation points (removing the node disconnects part of the surface: single points of
-  dependency such as one DNS provider or one certificate).
+- **Graph metrics** (`graph/metrics.py`, implemented but **not yet shown in the report**), on the
+  undirected view: degree (hubs), betweenness (where connections are routed), articulation points
+  (removing the node disconnects part of the surface: single points of dependency such as one DNS
+  provider or one certificate).
 - **Risk rules**: pure functions of the graph and a pinned date, one file each: `certificates`,
   `email-auth` (SPF/DMARC), `exposed-environments`, `hosting-sprawl`, `takeover` (DNS-only). Each
   finding has a severity, a `rationale`, the `evidence` nodes, and a `remediation`. Takeover is a lead

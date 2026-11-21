@@ -10,12 +10,12 @@ flowchart LR
     engine --> plugins["plugins/<br/>one passive source per module"]
     plugins -->|Observation| priv["privacy.py<br/>personal-data filters"]
     priv --> builder["graph/builder<br/>merge into SurfaceGraph"]
-    builder --> metrics["graph/metrics<br/>degree, betweenness,<br/>articulation points"]
     builder --> rules["risk/<br/>one explainable rule per file"]
-    metrics --> report["report/<br/>self-contained HTML"]
+    builder --> report["report/<br/>self-contained HTML"]
     rules -->|Finding| report
-    builder -.->|optional| neo4j[("Neo4j export")]
 ```
+
+Graph metrics (`graph/metrics.py`) and the Neo4j export are library modules, not wired into `surfacemap scan` yet.
 
 ## Design decisions
 

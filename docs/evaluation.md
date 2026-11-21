@@ -53,7 +53,8 @@ tool was missing its main source. It is not part of the results.
 
 ## Reading the graph metrics
 
-Computed by `surfacemap.graph.metrics` on the undirected view of the surface graph (direction of
+Implemented in `surfacemap.graph.metrics` (a library module: `surfacemap scan` does not show them in the
+report yet), on the undirected view of the surface graph (direction of
 dependency is irrelevant to "what breaks if this goes away").
 
 - **Degree**: number of neighbours. High degree = a hub (a provider, IP or certificate shared by
@@ -61,8 +62,8 @@ dependency is irrelevant to "what breaks if this goes away").
 - **Betweenness**: share of shortest paths passing through the node. High = the surface's
   connections are routed through it; it ranks the critical nodes.
 - **Articulation point**: removing the node disconnects part of the surface. These are the single
-  points of dependency (one DNS provider, one certificate, one IP) and are listed first in the
-  report, ordered by betweenness.
+  points of dependency (one DNS provider, one certificate, one IP) and are the ones to list first,
+  ordered by betweenness, once the metrics are shown in the report.
 
 On this target the graph is a handful of nodes, so these metrics carry no signal here; they are
 only informative on a surface with shared infrastructure across many hosts.
