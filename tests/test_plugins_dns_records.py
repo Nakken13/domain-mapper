@@ -257,3 +257,25 @@ async def test_every_query_spends_a_rate_limit_token(
 async def test_ignores_entities_that_are_not_domains(plugin_ctx: PluginContext) -> None:
     plugin = DnsPlugin(FakeResolver({}))
     assert await plugin.run(IPAddress(address="192.0.2.1"), plugin_ctx) == []
+
+
+async def test_mail_and_name_servers_of_a_cname_target_are_not_kept(
+    plugin_ctx: PluginContext,
+) -> None:
+    chain = rr("shop.example.com", "CNAME", "shops.saas.example.net")
+    resolver = FakeResolver(
+        {
+            ("shop.example.com", "MX"): DnsAnswer(
+                "NOERROR", (chain, rr("shops.saas.example.net", "MX", "mx.saas.example.net"))
+            ),
+            ("shop.example.com", "NS"): DnsAnswer(
+                "NOERROR", (chain, rr("shops.saas.example.net", "NS", "ns.saas.example.net"))
+            ),
+        }
+    )
+    [observation] = await run(resolver, "shop.example.com", plugin_ctx)
+    assert edges(observation) == {
+        ("domain:shop.example.com", RelationType.CNAME_TO, "domain:shops.saas.example.net")
+    }
+    # No MX was found for the queried name itself: no DMARC lookup either.
+    assert ("_dmarc.shop.example.com", "TXT") not in resolver.queries

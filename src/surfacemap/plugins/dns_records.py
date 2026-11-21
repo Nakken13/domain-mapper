@@ -82,6 +82,8 @@ class _Collected:
                     self.ips.add(ip)
                     self.edges.add((f"domain:{owner}", RelationType.RESOLVES_TO, f"ip:{ip}"))
             elif record.type in _EDGE_TYPES:
+                if record.type != "CNAME" and owner != queried:
+                    continue  # MX/NS of a CNAME target: enrichment of another name
                 target = _hostname(record.value) if record.value else None
                 if target is not None and target != owner:
                     self.names.update((owner, target))
