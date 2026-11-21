@@ -1,0 +1,13 @@
+[
+  ["timestamp", "original"],
+  ["20190304050607", "http://example.com/"],
+  ["20240101000000", "https://example.com/?utm_source=newsletter"],
+  ["20200202020202", "https://www.example.com:443/login?next=%2Fadmin&email=jane.doe%40example.com"],
+  ["20210303030303", "https://www.example.com/login#reset"],
+  ["20220404040404", "https://old.example.com/backup.zip"],
+  ["20230505050505", "https://partner.example.net/example.com/page"],
+  ["not-a-date", "https://www.example.com/broken"],
+  ["20230505050505"],
+  ["20230606060606", "mailto:jane.doe@example.com"],
+  ["20230707070707", "https://bad_host.example.com/x"]
+]

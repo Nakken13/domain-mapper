@@ -21,7 +21,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [ ] feat(plugins): whois fallback
 - [ ] feat(plugins): asn via Team Cymru DNS
 - [ ] feat(plugins): geoip (offline dataset, iptoasn/GeoLite2 - note licence)
-- [ ] feat(plugins): wayback CDX (no query strings kept)
+- [x] feat(plugins): wayback CDX (no query strings kept)
 - [ ] feat(plugins): shodan (read-only, API key optional)
 - [ ] feat(plugins): censys (read-only, API key optional)
 - [ ] feat(plugins): dorks generator (reuse/optional dependency on sibling project dorkint; never executes searches)

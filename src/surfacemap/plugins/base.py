@@ -200,7 +200,9 @@ def default_registry() -> PluginRegistry:
     """A fresh registry with the built-in plugins."""
     # Imported here: plugin modules import this one.
     from surfacemap.plugins.crtsh import CrtshPlugin
+    from surfacemap.plugins.wayback import WaybackPlugin
 
     registry = PluginRegistry()
-    registry.register(CrtshPlugin())
+    for plugin in (CrtshPlugin(), WaybackPlugin()):
+        registry.register(plugin)
     return registry
