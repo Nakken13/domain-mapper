@@ -11,7 +11,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 
 ## Actions
 
-- [ ] feat(eval): per-source subdomain counts + Venn diagram
+- [x] feat(eval): per-source subdomain counts + Venn diagram
 - [ ] feat(eval): Amass/Subfinder passive benchmark harness (coverage + run time) on logan-villard.fr
 - [ ] docs(eval): results + interpretation of graph metrics
 - [ ] Review + merge branch into main
