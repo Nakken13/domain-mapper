@@ -1,5 +1,9 @@
 # SurfaceMap
 
+[![CI](https://github.com/Nakken13/domain-mapper/actions/workflows/ci.yml/badge.svg)](https://github.com/Nakken13/domain-mapper/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+
 Passive attack-surface mapping of a domain you own or are authorized to assess, rendered as a graph.
 
 > Use only on domains listed in your `scope.yaml` (see [Ethics & legal](#ethics--legal)).
