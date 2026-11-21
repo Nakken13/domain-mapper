@@ -8,8 +8,8 @@ rate-limit token: Team Cymru asks heavy users to switch to its bulk interface.
 
 Only globally routable addresses are looked up: private, loopback, link-local or
 documentation addresses have no ASN, and sending them would leak internal addressing.
-The ASN carries its registration country; the country of the *address* is left to the
-geoip plugin, so that field has a single source.
+The ASN carries its registration country (from its AS record, not the prefix); the
+country of the *address* is left to the geoip plugin, so that field has a single source.
 """
 
 from __future__ import annotations
@@ -77,31 +77,30 @@ class AsnPlugin(PluginBase):
         ctx.cache.set(self.name, name, json.dumps(values))
         return values
 
-    async def _holder(self, number: int, ctx: PluginContext) -> str | None:
+    async def _asn(self, number: int, ctx: PluginContext) -> ASN:
+        """The ASN with its holder and registration country, from its own AS record.
+
+        Not the country of the origin answer: that one belongs to the prefix, and one ASN
+        announces prefixes from several countries.
+        """
         for value in await self._txt(f"AS{number}.asn.cymru.com", ctx) or []:
             fields = _fields(value)
             if len(fields) >= 5 and fields[4]:
-                return fields[4]
-        return None
+                return ASN(number=number, holder=fields[4], country=_country(fields[1]))
+        return ASN(number=number)
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, IPAddress) or not ipaddress.ip_address(entity.address).is_global:
             return []
         query = origin_name(entity)
-        origins: dict[int, str | None] = {}
+        origins: set[int] = set()
         for value in await self._txt(query, ctx) or []:
-            fields = _fields(value)
-            if len(fields) < 3:
-                continue
-            for raw in fields[0].split():
+            for raw in _fields(value)[0].split():
                 if raw.isdigit() and 1 <= int(raw) <= _MAX_ASN:
-                    origins[int(raw)] = _country(fields[2])
+                    origins.add(int(raw))
         if not origins:
             return []
-        asns = [
-            ASN(number=number, holder=await self._holder(number, ctx), country=country)
-            for number, country in sorted(origins.items())
-        ]
+        asns = [await self._asn(number, ctx) for number in sorted(origins)]
         ip = IPAddress(address=entity.address)
         return [
             Observation(

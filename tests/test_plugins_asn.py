@@ -30,7 +30,8 @@ class FakeResolver:
 def cymru() -> FakeResolver:
     return FakeResolver(
         {
-            "4.3.2.1.origin.asn.cymru.com": ["64500 | 1.2.3.0/24 | FR | ripencc | 2001-01-01"],
+            # The prefix is announced from DE; the ASN itself is registered in FR.
+            "4.3.2.1.origin.asn.cymru.com": ["64500 | 1.2.3.0/24 | DE | ripencc | 2001-01-01"],
             "AS64500.asn.cymru.com": [
                 "64500 | FR | ripencc | 2001-01-01 | EXAMPLE-NET - Example SAS, FR"
             ],
@@ -123,7 +124,7 @@ async def test_a_failed_holder_lookup_keeps_the_asn(plugin_ctx: PluginContext) -
     )
     [observation] = await AsnPlugin(resolver).run(V4, plugin_ctx)
     asn = next(e for e in observation.entities if isinstance(e, ASN))
-    assert asn == ASN(number=64500)  # invalid country code dropped
+    assert asn == ASN(number=64500)  # no holder, no country
 
 
 async def test_every_query_spends_a_rate_limit_token(
@@ -148,8 +149,9 @@ async def test_a_malformed_holder_answer_is_ignored(plugin_ctx: PluginContext) -
     resolver = FakeResolver(
         {
             "4.3.2.1.origin.asn.cymru.com": ["64500 | 1.2.3.0/24 | FR | ripencc | 2001-01-01"],
-            "AS64500.asn.cymru.com": ["64500 | FR", "64500 | FR | ripencc | 2001-01-01 | OK-NET"],
+            "AS64500.asn.cymru.com": ["64500 | FR", "64500 | ZZZ | ripencc | 2001-01-01 | OK-NET"],
         }
     )
     [observation] = await AsnPlugin(resolver).run(V4, plugin_ctx)
-    assert {e.holder for e in observation.entities if isinstance(e, ASN)} == {"OK-NET"}
+    [asn] = [e for e in observation.entities if isinstance(e, ASN)]
+    assert asn == ASN(number=64500, holder="OK-NET")  # invalid country code dropped
