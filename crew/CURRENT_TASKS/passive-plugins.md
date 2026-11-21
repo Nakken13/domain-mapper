@@ -34,4 +34,13 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - ~~feat(plugins): censys (read-only, API key optional)~~ dropped by the user 2026-11-21
 - [x] feat(plugins): dorks generator (reuse/optional dependency on sibling project dorkint; never executes searches)
 - [x] docs(plugins): verify each module docstring states the traffic it emits
-- [ ] Review + merge branch into main
+- [ ] Review fixes (deep review 2026-11-21, verdict "with fixes"; item 1 done in the wayback email commit):
+  - [ ] crtsh `_minimize`: keep only identity lines that normalize as hostnames (S/MIME CN = person name reaches cache); `scrub_emails` on `issuer_name`
+  - [ ] crtsh: download deadline from call start (`asyncio.timeout_at(start + DOWNLOAD_BUDGET)`), a slow search must not lose subdomains
+  - [ ] dns/mailauth: DMARC empty "absent" only on scope roots (RFC 7489 § 6.6.3 fallback to org domain); multiple `v=DMARC1` → `dmarc_of` returns "invalid"
+  - [ ] crtsh: SECURED_BY edges only for in-scope hosts (same policy as wayback)
+  - [ ] `_resolver.DnspythonResolver`: build the dnspython resolver lazily (no OS config read at registry creation)
+  - [ ] geoip: `await asyncio.to_thread(_load, path)`; whois: `await writer.wait_closed()`; wayback: log when rows == CDX_LIMIT
+  - [ ] `simplify` pass (deep size): shared root-only applies_to, `_is_ip_literal` reuse from collect/http.py, one JSON-or-FetchError helper, `try_normalize`, shared NS observation (rdap/whois), `_COUNTRY`/`is_global` dupes, provenance helper
+  - Declined: Shodan hostnames as RESOLVES_TO (edge sources already distinguish Shodan); Shodan 404 noise (needs FetchError status in collect/http.py → follow-up)
+- [ ] Review + merge branch into main (main has uncommitted crew/ index edits from the hook: ask the user before committing/stashing them)
