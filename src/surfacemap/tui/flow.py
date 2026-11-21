@@ -55,7 +55,7 @@ def _scan(scope_file: Path, input_fn: InputFn, print_fn: PrintFn, scan_fn: ScanF
     """Asks domain and output, runs the scan; returns the report path if it was written."""
     domain = ask("Domain to scan", optional=False, input_fn=input_fn, print_fn=print_fn)
     default = f"{domain}-report.html"
-    answer = ask(f"Report file (ENTER = {default})", input_fn=input_fn, print_fn=print_fn)
+    answer = ask(f"Report file, default {default}", input_fn=input_fn, print_fn=print_fn)
     target = Path(answer or default)
     return target if scan_fn(domain, scope_file, target) == 0 else None
 

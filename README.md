@@ -46,6 +46,26 @@ which the domain is refused.
 
 The report is a single self-contained HTML file (Cytoscape.js inlined): open it offline.
 
+## Menu (TUI)
+
+Prefer a menu to flags? `surfacemap-tool` opens a numbered menu (banner, scope check, scan, open the last
+report). It needs an interactive terminal and the same `scope.yaml` in the current directory.
+
+```bash
+surfacemap-tool
+```
+
+| Key | Action |
+|---|---|
+| `1` | Scope check: is a domain covered by `scope.yaml`? |
+| `2` | Scan a domain, then write the HTML report (default `<domain>-report.html`) |
+| `3` | Open the last report written in this session in the browser |
+| `0` | About, `q` quit |
+
+The menu calls the same `scope check` and `scan` code as the CLI, so the scope is checked first and an
+out-of-scope domain is refused without any request. If the command is not found after pulling, re-run
+`python -m pip install -e ".[dev]"` to register the new entry point.
+
 ## Demo
 
 ![Report demo: surface graph, then risk findings](media/surfacemap-demo.gif)
