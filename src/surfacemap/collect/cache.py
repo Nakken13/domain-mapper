@@ -50,14 +50,15 @@ class ResponseCache:
             self._db.execute(_SCHEMA)
         self.purge_expired()
 
-    def _now(self) -> float:
-        return self._clock().timestamp()
+    def _cutoff(self) -> float:
+        """Rows stored at or before this timestamp are expired."""
+        return self._clock().timestamp() - self._ttl
 
     def get(self, source: str, query: str) -> str | None:
         """The stored body, or None when absent or older than the TTL."""
         row = self._db.execute(
             "SELECT body FROM responses WHERE source = ? AND query = ? AND stored_at > ?",
-            (source, query, self._now() - self._ttl),
+            (source, query, self._cutoff()),
         ).fetchone()
         return None if row is None else str(row[0])
 
@@ -65,14 +66,14 @@ class ResponseCache:
         with self._db:
             self._db.execute(
                 "INSERT OR REPLACE INTO responses VALUES (?, ?, ?, ?)",
-                (source, query, body, self._now()),
+                (source, query, body, self._clock().timestamp()),
             )
 
     def purge_expired(self) -> int:
         """Delete stale rows; return how many were removed."""
         with self._db:
             cursor = self._db.execute(
-                "DELETE FROM responses WHERE stored_at <= ?", (self._now() - self._ttl,)
+                "DELETE FROM responses WHERE stored_at <= ?", (self._cutoff(),)
             )
         return cursor.rowcount
 

@@ -30,20 +30,14 @@ from surfacemap.collect.http import HttpClient
 from surfacemap.collect.ratelimit import RateLimiter
 from surfacemap.config import Settings
 from surfacemap.models import (
-    ASN,
-    ArchivedURL,
-    Certificate,
-    Domain,
     Entity,
-    IPAddress,
     Observation,
-    Technology,
 )
 from surfacemap.scope import InvalidDomainError, Scope, normalize_domain
 
+# Derived from the `Entity` union, so a new entity type is accepted without edits here.
 ENTITY_KINDS = frozenset(
-    get_args(model.model_fields["kind"].annotation)[0]
-    for model in (Domain, IPAddress, ASN, Certificate, Technology, ArchivedURL)
+    get_args(model.model_fields["kind"].annotation)[0] for model in get_args(get_args(Entity)[0])
 )
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 ENGINE_SOURCE = "surfacemap"
@@ -60,9 +54,15 @@ class ScopeView:
     def __init__(self, scope: Scope, today: date) -> None:
         self._scope = scope
         self.today = today
+        self._in_scope: dict[str, bool] = {}
+        self._target_hosts: dict[str, bool] = {}
 
     def is_in_scope(self, fqdn: str) -> bool:
-        return self._scope.check(fqdn, today=self.today).allowed
+        # Memoized: the date is pinned, so the answer cannot change during the run.
+        cached = self._in_scope.get(fqdn)
+        if cached is None:
+            cached = self._in_scope[fqdn] = self._scope.check(fqdn, today=self.today).allowed
+        return cached
 
     def root_of(self, fqdn: str) -> str | None:
         """The authorized domain covering `fqdn`, or None when it is out of scope."""
@@ -80,11 +80,15 @@ class ScopeView:
         Every spelling is tried, because scope names are normalized with Python's IDNA 2003
         codec (`ß` -> `ss`) while httpx sends IDNA 2008 (`ß` -> `xn--zca`).
         """
-        return any(
-            name == e.domain or name.endswith("." + e.domain)
-            for name in _spellings(host)
-            for e in self._scope.entries
-        )
+        cached = self._target_hosts.get(host)
+        if cached is None:
+            # Not `ScopeEntry.covers`: that honours include_subdomains, this must not.
+            cached = self._target_hosts[host] = any(
+                name == e.domain or name.endswith("." + e.domain)
+                for name in _spellings(host)
+                for e in self._scope.entries
+            )
+        return cached
 
 
 def _spellings(host: str) -> set[str]:

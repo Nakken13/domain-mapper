@@ -42,7 +42,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable
+from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
@@ -50,6 +51,7 @@ from enum import IntEnum
 from surfacemap.collect.http import PassiveViolationError
 from surfacemap.graph.builder import SurfaceGraph
 from surfacemap.models import Domain, Entity, Observation, Provenance, Relation, RelationType
+from surfacemap.models.entities import id_kind
 from surfacemap.plugins.base import ENGINE_SOURCE, Plugin, PluginContext, ScopeView
 from surfacemap.privacy import redact_observation
 
@@ -118,9 +120,9 @@ class Engine:
             done.update((plugin.name, entity.id) for plugin, entity in items)
             results = await asyncio.gather(*(self._call(semaphore, *item) for item in items))
             frontier = set()
-            for (plugin, entity), observations in zip(items, results, strict=True):
+            for (_plugin, entity), observations in zip(items, results, strict=True):
                 for observation in observations:
-                    frontier |= self._absorb(graph, reach, expanded, plugin, entity, observation)
+                    frontier |= self._absorb(graph, reach, expanded, entity, observation)
         else:
             if frontier:
                 logger.info("max depth reached with %d entities left", len(frontier))
@@ -163,7 +165,7 @@ class Engine:
         async with semaphore:
             try:
                 async with asyncio.timeout(self._limits.plugin_timeout):
-                    return list(await plugin.run(entity, self._ctx))
+                    results = list(await plugin.run(entity, self._ctx))
             except Exception as exc:  # isolate any plugin bug; cancellation still propagates
                 # A plugin aiming at the target breaks the passive contract: louder than a bug.
                 level = logging.ERROR if isinstance(exc, PassiveViolationError) else logging.WARNING
@@ -171,26 +173,17 @@ class Engine:
                     level, "plugin %s failed on %s: %s", plugin.name, entity.id, type(exc).__name__
                 )
                 return []
+        return [o for o in results if _is_own_observation(plugin, o)]
 
     def _absorb(
         self,
         graph: SurfaceGraph,
         reach: dict[str, Reach],
         expanded: dict[str, Reach],
-        plugin: Plugin,
         subject: Entity,
-        observation: object,
+        observation: Observation,
     ) -> set[str]:
         """Merge one observation; return the ids to expand in the next wave."""
-        if not isinstance(observation, Observation):
-            logger.warning("plugin %s returned a non-Observation: dropped", plugin.name)
-            return set()
-        if observation.provenance.source != plugin.name:
-            logger.warning(
-                "plugin %s emitted an observation attributed to another source: dropped",
-                plugin.name,
-            )
-            return set()
 
         # Redact here (merge redacts again, idempotently): redaction can change an id
         # (an email scrubbed from a URL path), and the next wave must use graph ids.
@@ -201,19 +194,16 @@ class Engine:
         )
         graph.merge(clean)
 
-        scope = self._ctx.scope
-        levels = _levels_in(clean, reach, reach[subject.id], scope)
+        assessed = _ReachAssessment(clean, reach, reach[subject.id], self._ctx.scope)
         cname_targets = {r.target for r in clean.relations if r.type is RelationType.CNAME_TO}
         expand = set()
         for entity in clean.entities:
-            level = max(levels[entity.id], reach.get(entity.id, Reach.RESOLVE_ONLY))
+            level = max(assessed.levels[entity.id], reach.get(entity.id, Reach.RESOLVE_ONLY))
             reach[entity.id] = level
             # Out of scope, only the CNAME chain is followed (to reach the IPs); names the
             # scope authorizes are always expanded. The rest is recorded, not crawled.
             may_expand = (
-                level is Reach.FULL
-                or _parent_level(entity.id, clean, levels, reach, reach[subject.id], scope)
-                is Reach.FULL
+                Reach.FULL in (level, assessed.parent_levels[entity.id])
                 or entity.id in cname_targets
             )
             # Tracked apart from reach: a node first recorded without expansion must still
@@ -230,84 +220,95 @@ class Engine:
 
     @staticmethod
     def _link_subdomains(graph: SurfaceGraph, root: str) -> None:
-        fqdns = {
-            node.entity.fqdn for node in graph.nodes.values() if isinstance(node.entity, Domain)
+        domains = {
+            node.entity.fqdn: node.entity
+            for node in graph.nodes.values()
+            if isinstance(node.entity, Domain)
         }
         relations = []
-        for fqdn in sorted(fqdns):
+        for fqdn in sorted(domains):
             labels = fqdn.split(".")
             parent = next(
-                (p for i in range(1, len(labels)) if (p := ".".join(labels[i:])) in fqdns), None
+                (p for i in range(1, len(labels)) if (p := ".".join(labels[i:])) in domains), None
             )
             if parent is not None:
                 relations.append(
-                    Relation(
-                        source=f"domain:{parent}",
-                        type=RelationType.HAS_SUBDOMAIN,
-                        target=f"domain:{fqdn}",
-                    )
+                    Relation.between(domains[parent], RelationType.HAS_SUBDOMAIN, domains[fqdn])
                 )
         if relations:
             graph.merge(_engine_observation(root, relations=tuple(relations)))
 
 
-def _parent_level(
-    entity_id: str,
-    observation: Observation,
-    levels: dict[str, Reach],
-    reach: dict[str, Reach],
-    fallback: Reach,
-    scope: ScopeView,
-) -> Reach:
-    """Highest reach among the nodes pointing at `entity_id` in this observation.
-
-    `fallback` (the queried subject) applies only when nothing points at the entity. A
-    parent known only as a relation endpoint is judged fail-closed: by the scope for a
-    domain id, RESOLVE_ONLY otherwise.
-    """
-    parents = [r.source for r in observation.relations if r.target == entity_id]
-    if not parents:
-        return fallback
-    return max(_known_level(parent, levels, reach, scope) for parent in parents)
-
-
-def _known_level(
-    entity_id: str, levels: dict[str, Reach], reach: dict[str, Reach], scope: ScopeView
-) -> Reach:
-    level = levels.get(entity_id) or reach.get(entity_id)
-    if level is not None:
-        return level
-    kind, _, value = entity_id.partition(":")
-    if kind == "domain" and scope.is_in_scope(value):
-        return Reach.FULL
-    return Reach.RESOLVE_ONLY
-
-
-def _levels_in(
-    observation: Observation, reach: dict[str, Reach], subject_reach: Reach, scope: ScopeView
-) -> dict[str, Reach]:
-    """Reach of each entity as stated by this observation (review I2).
+class _ReachAssessment:
+    """Reach of each entity of one observation, and of the nodes pointing at it (review I2).
 
     Domains: from the scope. Other entities: from the nodes pointing at them inside the
     observation (a resolver answer carries the whole CNAME chain, so a CDN IP takes the
-    CDN name's reach, not the queried name's); the queried subject only when unlinked.
+    CDN name's reach, not the queried name's); the queried subject only when nothing
+    points at them. A parent known only as a relation endpoint is judged fail-closed: by
+    the scope for a domain id, RESOLVE_ONLY otherwise.
     """
-    levels = {
-        e.id: Reach.FULL if e.in_scope else Reach.RESOLVE_ONLY
-        for e in observation.entities
-        if isinstance(e, Domain)
-    }
-    others = [e.id for e in observation.entities if not isinstance(e, Domain)]
-    for _ in range(len(others) + 1):  # chains (domain -> ip -> asn) settle in a few passes
-        changed = False
-        for entity_id in others:
-            level = _parent_level(entity_id, observation, levels, reach, subject_reach, scope)
-            if levels.get(entity_id) != level:
-                levels[entity_id] = level
-                changed = True
-        if not changed:
-            break
-    return levels
+
+    def __init__(
+        self,
+        observation: Observation,
+        reach: Mapping[str, Reach],
+        subject_reach: Reach,
+        scope: ScopeView,
+    ) -> None:
+        self._reach = reach
+        self._subject_reach = subject_reach
+        self._scope = scope
+        self._parents: dict[str, list[str]] = defaultdict(list)
+        for relation in observation.relations:
+            self._parents[relation.target].append(relation.source)
+
+        self.levels: dict[str, Reach] = {
+            e.id: Reach.FULL if e.in_scope else Reach.RESOLVE_ONLY
+            for e in observation.entities
+            if isinstance(e, Domain)
+        }
+        others = [e.id for e in observation.entities if not isinstance(e, Domain)]
+        for _ in range(len(others) + 1):  # chains (domain -> ip -> asn) settle in a few passes
+            changed = False
+            for entity_id in others:
+                level = self._parent_level(entity_id)
+                if self.levels.get(entity_id) != level:
+                    self.levels[entity_id] = level
+                    changed = True
+            if not changed:
+                break
+        self.parent_levels = {e.id: self._parent_level(e.id) for e in observation.entities}
+
+    def _parent_level(self, entity_id: str) -> Reach:
+        parents = self._parents.get(entity_id)
+        if not parents:
+            return self._subject_reach
+        return max(self._known_level(parent) for parent in parents)
+
+    def _known_level(self, entity_id: str) -> Reach:
+        level = self.levels.get(entity_id) or self._reach.get(entity_id)
+        if level is not None:
+            return level
+        if id_kind(entity_id) == "domain" and self._scope.is_in_scope(
+            entity_id.removeprefix("domain:")
+        ):
+            return Reach.FULL
+        return Reach.RESOLVE_ONLY
+
+
+def _is_own_observation(plugin: Plugin, result: object) -> bool:
+    """Drop anything but an Observation attributed to the plugin that returned it."""
+    if not isinstance(result, Observation):
+        logger.warning("plugin %s returned a non-Observation: dropped", plugin.name)
+        return False
+    if result.provenance.source != plugin.name:
+        logger.warning(
+            "plugin %s emitted an observation attributed to another source: dropped",
+            plugin.name,
+        )
+        return False
+    return True
 
 
 def _engine_observation(

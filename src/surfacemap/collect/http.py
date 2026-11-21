@@ -105,34 +105,29 @@ class HttpClient:
             return cached
 
         all_params = {**(params or {}), **(secret_params or {})}
-        for attempt in range(self._max_retries + 1):
+        attempt = 0
+        while True:
             await self._limiter.acquire(source)
-            last_attempt = attempt == self._max_retries
-            response, failure, retryable = await self._attempt(url, all_params, headers)
-            if response is not None and response.is_success:
-                self._cache.set(source, cache_key, response.text)
-                return response.text
-            if response is not None:
+            delay: float | None = None
+            try:
+                response = await self._client.get(url, params=all_params, headers=headers)
+            except httpx.TransportError as exc:
+                failure, retryable = type(exc).__name__, True
+            except (httpx.HTTPError, httpx.InvalidURL) as exc:
+                failure, retryable = type(exc).__name__, False
+            else:
+                if response.is_success:
+                    self._cache.set(source, cache_key, response.text)
+                    return response.text
                 failure = f"HTTP {response.status_code}"
                 retryable = response.status_code in _RETRYABLE
-            if not retryable or last_attempt:
+                delay = _retry_after(response)
+            if not retryable or attempt == self._max_retries:
                 # Raised outside any `except`: no httpx error (and its URL) in __context__.
                 raise FetchError(f"{source}: {failure}")
             logger.warning("%s: %s, retrying", source, failure)
-            delay = _retry_after(response) if response is not None else None
             await self._sleep(delay if delay is not None else self._backoff * 2**attempt)
-        raise AssertionError("unreachable")  # pragma: no cover
-
-    async def _attempt(
-        self, url: str, params: Mapping[str, str], headers: Mapping[str, str] | None
-    ) -> tuple[httpx.Response | None, str, bool]:
-        """One request: (response, "", False) or (None, error type name, retryable)."""
-        try:
-            return await self._client.get(url, params=params, headers=headers), "", False
-        except httpx.TransportError as exc:
-            return None, type(exc).__name__, True
-        except (httpx.HTTPError, httpx.InvalidURL) as exc:
-            return None, type(exc).__name__, False
+            attempt += 1
 
 
 def _host_of(url: str) -> str:
