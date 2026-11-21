@@ -12,7 +12,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 ## Actions
 
 - [x] feat(collect): SQLite response cache with TTL (key = source + query)
-- [ ] feat(collect): per-source token-bucket rate limiter
+- [x] feat(collect): per-source token-bucket rate limiter
 - [ ] feat(collect): httpx async client with retries and honest User-Agent
 - [ ] feat(plugins): Plugin Protocol + registry (`plugins/base.py`)
 - [ ] feat(collect): iterative asyncio engine: newly found subdomains re-fed to DNS; out-of-scope nodes recorded + DNS-resolved only, never enriched further (scope.require first)
