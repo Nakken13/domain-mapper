@@ -12,13 +12,17 @@ Reach, per entity id, encodes the out-of-scope policy ("recorded + DNS-resolved,
 enriched further"):
 
 * a domain's reach comes from the scope alone: FULL when authorized, else RESOLVE_ONLY;
-* any other entity inherits the reach of the entity whose plugin produced it, so an IP
-  behind an out-of-scope CDN CNAME is RESOLVE_ONLY and gets no ASN lookup;
+* any other entity takes the highest reach of the nodes pointing at it in the same
+  observation (the queried entity when nothing links it), so an IP behind an
+  out-of-scope CDN CNAME is RESOLVE_ONLY and gets no ASN lookup, even when the resolver
+  returned the whole chain for an in-scope name;
 * reach only goes up (an in-scope path reaching that IP later upgrades it, and the
   plugins it missed run in the next wave), so the loop terminates;
 * RESOLVE_ONLY entities only see plugins declaring `runs_out_of_scope=True`, and what
   they produce is only expanded along their CNAME chain (or when the scope authorizes
-  it): a CDN's NS/MX hosts are recorded, not crawled hop after hop.
+  it): a CDN's NS/MX hosts are recorded, not crawled hop after hop. Expansion is tracked
+  apart from reach, so a node recorded unexpanded is still resolved if a later path
+  (e.g. an in-scope CNAME) allows it.
 
 The engine, not the plugin, stamps `Domain.in_scope` before merging: the builder makes
 `False` win, so a wrong plugin flag would otherwise stick. The next wave reads entities
@@ -98,6 +102,7 @@ class Engine:
         graph.merge(_engine_observation(root, entities=(seed_entity,)))
 
         reach: dict[str, Reach] = {seed_entity.id: Reach.FULL}
+        expanded: dict[str, Reach] = {seed_entity.id: Reach.FULL}
         done: set[tuple[str, str]] = set()
         frontier = {seed_entity.id}
         budget = self._limits.max_work_items
@@ -116,7 +121,7 @@ class Engine:
             frontier = set()
             for (plugin, entity), observations in zip(items, results, strict=True):
                 for observation in observations:
-                    frontier |= self._absorb(graph, reach, plugin, entity, observation)
+                    frontier |= self._absorb(graph, reach, expanded, plugin, entity, observation)
         else:
             if frontier:
                 logger.info("max depth reached with %d entities left", len(frontier))
@@ -161,6 +166,7 @@ class Engine:
         self,
         graph: SurfaceGraph,
         reach: dict[str, Reach],
+        expanded: dict[str, Reach],
         plugin: Plugin,
         subject: Entity,
         observation: object,
@@ -185,24 +191,23 @@ class Engine:
         )
         graph.merge(clean)
 
-        subject_reach = reach[subject.id]
-        cname_targets = {
-            r.target
-            for r in clean.relations
-            if r.type is RelationType.CNAME_TO and r.source == subject.id
-        }
+        levels = _levels_in(clean, reach, reach[subject.id])
+        cname_targets = {r.target for r in clean.relations if r.type is RelationType.CNAME_TO}
         expand = set()
         for entity in clean.entities:
-            if isinstance(entity, Domain):
-                level = Reach.FULL if entity.in_scope else Reach.RESOLVE_ONLY
-            else:
-                level = subject_reach
-            if level <= reach.get(entity.id, 0):
-                continue
+            level = max(levels[entity.id], reach.get(entity.id, Reach.RESOLVE_ONLY))
             reach[entity.id] = level
-            # An out-of-scope subject only leads on along its CNAME chain (to reach the
-            # IPs) or to names the scope authorizes: the rest is recorded, not crawled.
-            if subject_reach is Reach.FULL or level is Reach.FULL or entity.id in cname_targets:
+            # Out of scope, only the CNAME chain is followed (to reach the IPs); names the
+            # scope authorizes are always expanded. The rest is recorded, not crawled.
+            may_expand = (
+                level is Reach.FULL
+                or _parent_level(entity.id, clean, levels, reach, reach[subject.id]) is Reach.FULL
+                or entity.id in cname_targets
+            )
+            # Tracked apart from reach: a node first recorded without expansion must still
+            # be expanded when a later path allows it (review I1).
+            if may_expand and expanded.get(entity.id, 0) < level:
+                expanded[entity.id] = level
                 expand.add(entity.id)
         return expand
 
@@ -232,6 +237,49 @@ class Engine:
                 )
         if relations:
             graph.merge(_engine_observation(root, relations=tuple(relations)))
+
+
+def _parent_level(
+    entity_id: str,
+    observation: Observation,
+    levels: dict[str, Reach],
+    reach: dict[str, Reach],
+    fallback: Reach,
+) -> Reach:
+    """Highest reach among the nodes pointing at `entity_id` in this observation."""
+    known = [
+        level
+        for r in observation.relations
+        if r.target == entity_id and (level := levels.get(r.source) or reach.get(r.source))
+    ]
+    return max(known) if known else fallback
+
+
+def _levels_in(
+    observation: Observation, reach: dict[str, Reach], subject_reach: Reach
+) -> dict[str, Reach]:
+    """Reach of each entity as stated by this observation (review I2).
+
+    Domains: from the scope. Other entities: from the nodes pointing at them inside the
+    observation (a resolver answer carries the whole CNAME chain, so a CDN IP takes the
+    CDN name's reach, not the queried name's); the queried subject only when unlinked.
+    """
+    levels = {
+        e.id: Reach.FULL if e.in_scope else Reach.RESOLVE_ONLY
+        for e in observation.entities
+        if isinstance(e, Domain)
+    }
+    others = [e.id for e in observation.entities if not isinstance(e, Domain)]
+    for _ in range(len(others) + 1):  # chains (domain -> ip -> asn) settle in a few passes
+        changed = False
+        for entity_id in others:
+            level = _parent_level(entity_id, observation, levels, reach, subject_reach)
+            if levels.get(entity_id) != level:
+                levels[entity_id] = level
+                changed = True
+        if not changed:
+            break
+    return levels
 
 
 def _engine_observation(

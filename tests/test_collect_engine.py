@@ -395,3 +395,61 @@ async def test_out_of_scope_subject_only_expands_its_cname_chain(ctx: PluginCont
     assert edge.id in dns.calls  # the CNAME chain is followed down to its IPs
     assert ns.id not in dns.calls  # third-party infrastructure is not crawled
     assert back.id in dns.calls  # the scope, not the path, decides for target names
+
+
+async def test_node_first_seen_unexpanded_is_resolved_when_reached_again(
+    ctx: PluginContext,
+) -> None:
+    # Review I1: ns.cdn.net is first an NS of an out-of-scope host (recorded only), then a
+    # CNAME target of an in-scope name: it must be DNS-resolved after all.
+    a, ns, www = dom("a.cdn.net", False), dom("ns.cdn.net", False), dom("www.example.com")
+    dns = Fake(
+        "dns",
+        {"domain"},
+        table(
+            "dns",
+            {
+                "domain:example.com": [
+                    a,
+                    www,
+                    Relation.between(dom("example.com"), RelationType.CNAME_TO, a),
+                ],
+                a.id: [ns, Relation.between(a, RelationType.NS, ns)],
+                www.id: [ns, Relation.between(www, RelationType.CNAME_TO, ns)],
+            },
+        ),
+        runs_out_of_scope=True,
+    )
+    await Engine([dns], ctx).run("example.com")
+    assert ns.id in dns.calls
+
+
+async def test_reach_follows_relations_inside_a_multi_hop_answer(ctx: PluginContext) -> None:
+    # Review I2: a resolver returns the whole chain in one observation. The CDN IP must take
+    # the reach of the CDN name resolving to it, not of the in-scope name that was queried.
+    asn_entity = ASN(number=64500)
+    dns = Fake(
+        "dns",
+        {"domain"},
+        table(
+            "dns",
+            {
+                API.id: [
+                    API,
+                    CDN,
+                    IP_CDN,
+                    asn_entity,
+                    Relation.between(API, RelationType.CNAME_TO, CDN),
+                    Relation.between(CDN, RelationType.RESOLVES_TO, IP_CDN),
+                    Relation.between(IP_CDN, RelationType.ANNOUNCED_BY, asn_entity),
+                ],
+                "domain:example.com": [API],
+            },
+        ),
+        runs_out_of_scope=True,
+    )
+    asn = Fake("asn", {"ip"}, lambda ip: [])
+    tech = Fake("tech", {"asn"}, lambda a: [])
+    await Engine([dns, asn, tech], ctx).run("example.com")
+    assert IP_CDN.id not in asn.calls
+    assert asn_entity.id not in tech.calls  # two hops away from the CDN name: still limited
