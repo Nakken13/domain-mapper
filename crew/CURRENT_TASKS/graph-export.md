@@ -12,6 +12,6 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 ## Actions
 
 - [x] feat(graph): NetworkX JSON/GraphML export
-- [ ] feat(graph): Neo4j export + `docker-compose.yml` (optional)
+- [x] feat(graph): Neo4j export + `docker-compose.yml` (optional)
 - [ ] feat(graph): centrality metrics (degree, betweenness, articulation points) to flag critical nodes
 - [ ] Review + merge branch into main

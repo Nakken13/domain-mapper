@@ -1,0 +1,15 @@
+# Optional: local Neo4j to browse a SurfaceMap export (http://localhost:7474).
+# Not needed for the HTML report. Set NEO4J_PASSWORD before `docker compose up`.
+services:
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "127.0.0.1:7474:7474"   # browser, local only
+      - "127.0.0.1:7687:7687"   # bolt, local only
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?set NEO4J_PASSWORD}"
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  neo4j_data:
