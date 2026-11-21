@@ -6,7 +6,7 @@ import json
 import re
 
 from risk_helpers import graph_of
-from surfacemap.models import Domain, Relation, RelationType
+from surfacemap.models import Domain, IPAddress, Relation, RelationType
 from surfacemap.report import render_report
 from surfacemap.report.graphdata import graph_elements, to_script_json
 
@@ -88,3 +88,25 @@ def test_vendored_cytoscape_matches_the_pinned_hash() -> None:
 def test_report_counts_every_drawn_node() -> None:
     html = render_report(_graph(), [], domain="example.com")
     assert "3 nodes, 2 relations" in html
+
+
+def test_only_domains_can_be_flagged_out_of_scope() -> None:
+    graph = graph_of(
+        Domain(fqdn="example.com", in_scope=True),
+        IPAddress(address="192.0.2.1"),
+        Relation(
+            source="domain:example.com",
+            type=RelationType.RESOLVES_TO,
+            target="ip:192.0.2.1",
+        ),
+        Relation(
+            source="domain:example.com",
+            type=RelationType.CNAME_TO,
+            target="domain:out.other.net",
+        ),
+    )
+    nodes = {n["id"]: n for n in graph_elements(graph)["nodes"]}
+    assert nodes["domain:out.other.net"]["out_of_scope"] is True
+    assert nodes["domain:example.com"]["out_of_scope"] is False
+    # An IP has no scope: drawing it as "outside the authorized scope" would mislead.
+    assert nodes["ip:192.0.2.1"]["out_of_scope"] is False

@@ -19,13 +19,17 @@ def graph_elements(graph: SurfaceGraph) -> dict[str, list[dict[str, Any]]]:
     nodes = []
     for node_id in node_ids(graph):
         props = node_props(graph, node_id)
+        is_domain = id_kind(node_id) == "domain"
+        in_scope = bool(props.get("in_scope", False)) and is_domain
         nodes.append(
             {
                 "id": node_id,
                 "label": _label(node_id),
                 "kind": kind_of(node_id),
                 # Only domains carry a scope flag; an undescribed endpoint is not authorized.
-                "in_scope": bool(props.get("in_scope", False)) and id_kind(node_id) == "domain",
+                "in_scope": in_scope,
+                # Drawn dashed. Only a domain can be outside the scope: an IP or an ASN has none.
+                "out_of_scope": is_domain and not in_scope,
             }
         )
     edges = [

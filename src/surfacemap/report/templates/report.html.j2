@@ -18,7 +18,7 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
 .sev { display: inline-block; padding: 0 .5rem; border-radius: 999px; border: 1px solid currentColor; font-size: .8125rem; font-weight: 600; text-transform: lowercase; }
 .sev-critical { color: #cf222e; } .sev-high { color: #bc4c00; } .sev-medium { color: #9a6700; } .sev-low { color: #0969da; } .sev-info { color: var(--muted); }
 @media (prefers-color-scheme: dark) { .sev-critical { color: #ff7b72; } .sev-high { color: #ffa657; } .sev-medium { color: #e3b341; } .sev-low { color: #79c0ff; } }
-.evidence { font-family: ui-monospace, monospace; font-size: .8125rem; word-break: break-all; }
+.evidence { font-family: ui-monospace, monospace; font-size: .8125rem; overflow-wrap: anywhere; }
 .legend { color: var(--muted); font-size: .875rem; margin: .5rem 0 1.5rem; }
 </style>
 </head>
@@ -27,7 +27,7 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
 <h1>Attack surface of {{ domain }}</h1>
 <p class="meta">{{ node_count }} nodes, {{ edge_count }} relations, {{ findings|length }} findings. Passive sources only.</p>
 <div id="cy" role="img" aria-label="Graph of {{ node_count }} nodes and {{ edge_count }} relations for {{ domain }}"></div>
-<p class="legend">Solid outline: in scope. Dashed outline: seen in passive data but outside the authorized scope.</p>
+<p class="legend">Solid outline: in scope, or not a domain (IPs and ASNs have no scope). Dashed red outline: a domain seen in passive data but outside the authorized scope.</p>
 <h2>Findings</h2>
 {% if findings %}
 <div class="table-wrap">
@@ -76,8 +76,7 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
         "label": "data(label)", "font-size": 10, "color": "#8b949e", "text-valign": "bottom", "text-margin-y": 4,
         "background-color": function (n) { return colors[n.data("kind")] || "#8b949e"; },
         "border-width": 2, "border-color": "#0d1117" } },
-      { selector: "node[?in_scope]", style: { "border-style": "solid" } },
-      { selector: "node[!in_scope]", style: { "border-style": "dashed", "border-color": "#f85149" } },
+      { selector: "node[?out_of_scope]", style: { "border-style": "dashed", "border-color": "#f85149" } },
       { selector: "edge", style: { "width": 1, "line-color": "#8b949e", "target-arrow-color": "#8b949e",
         "target-arrow-shape": "triangle", "curve-style": "bezier" } }
     ]
