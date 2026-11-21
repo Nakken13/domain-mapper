@@ -6,6 +6,10 @@ parameter can therefore never be written to disk. Source and query are two separ
 key columns, so no concatenation can make two different keys collide.
 
 Callers store only successful responses (no 429/5xx), so an outage is never cached.
+
+Bodies are raw third-party responses: an RDAP/WHOIS answer may hold registrant data
+before `privacy` filters it out of the graph. The cache file therefore stays local
+(`cache_dir` is gitignored), and stale rows are purged every time the cache is opened.
 """
 
 from __future__ import annotations
@@ -44,6 +48,7 @@ class ResponseCache:
         self._db = sqlite3.connect(path)
         with self._db:
             self._db.execute(_SCHEMA)
+        self.purge_expired()
 
     def _now(self) -> float:
         return self._clock().timestamp()

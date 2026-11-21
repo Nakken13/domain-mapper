@@ -3,12 +3,13 @@
 Guarantees enforced here rather than trusted to each plugin:
 
 * **Passive only**: a request whose host is the target (any host covered by the scope)
-  is refused before anything is sent, and redirects are never followed, so a third
-  party cannot bounce us onto the target.
+  or an IP literal (every allowed third party is reached by name) is refused before
+  anything is sent, and redirects are never followed, so a third party cannot bounce
+  us onto the target.
 * **Honest identity**: a fixed `SurfaceMap/<version>` User-Agent, no browser spoofing.
 * **Rate limits**: every attempt, retries included, spends a token of its source.
-* **Cache**: keyed by the plugin's logical query; a hit spends no token and sends nothing.
-  Only 2xx bodies are stored.
+* **Cache**: keyed by the logical query + URL + non-secret params; a hit spends no
+  token and sends nothing. Only 2xx bodies are stored.
 * **Secrets**: `secret_params` (e.g. an API key the provider wants in the URL) are added
   to the request only. They never reach the cache key, an error message, a chained
   exception or the httpx request log (silenced below INFO level, where it prints URLs).
@@ -17,6 +18,8 @@ Guarantees enforced here rather than trusted to each plugin:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
+import json
 import logging
 from collections.abc import Callable, Mapping
 
@@ -46,7 +49,7 @@ class PassiveViolationError(PermissionError):
 
 def _retry_after(response: httpx.Response) -> float | None:
     raw = response.headers.get("Retry-After", "")
-    return min(float(raw), MAX_RETRY_AFTER) if raw.isdigit() else None
+    return min(float(raw), MAX_RETRY_AFTER) if raw.isascii() and raw.isdigit() else None
 
 
 class HttpClient:
@@ -84,13 +87,20 @@ class HttpClient:
         secret_params: Mapping[str, str] | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> str:
-        """GET `url` for plugin `source`; `query` is the logical cache key (no secret)."""
-        # raw_host is the ASCII (punycode) name actually sent, the form scope entries use.
-        host = httpx.URL(url).raw_host.decode("ascii").lower().removesuffix(".")
-        if self._is_forbidden_host(host):
-            raise PassiveViolationError(f"{source}: refused to contact the target host {host}")
+        """GET `url` for plugin `source`.
 
-        cached = self._cache.get(source, query)
+        `query` is the logical query (as in `Provenance.query`). The cache key is that
+        query plus the URL and the non-secret params, so pages of one query never collide.
+        """
+        try:
+            host = _host_of(url)
+        except httpx.InvalidURL:
+            raise FetchError(f"{source}: InvalidURL") from None
+        if _is_ip_literal(host) or self._is_forbidden_host(host):
+            raise PassiveViolationError(f"{source}: refused to contact {host} directly")
+
+        cache_key = json.dumps([query, url, sorted((params or {}).items())])
+        cached = self._cache.get(source, cache_key)
         if cached is not None:
             return cached
 
@@ -98,22 +108,41 @@ class HttpClient:
         for attempt in range(self._max_retries + 1):
             await self._limiter.acquire(source)
             last_attempt = attempt == self._max_retries
-            try:
-                response = await self._client.get(url, params=all_params, headers=headers)
-            except httpx.TransportError as exc:
-                # Message dropped and chain suppressed: httpx errors may embed the URL.
-                if last_attempt:
-                    raise FetchError(f"{source}: {type(exc).__name__}") from None
-                logger.warning("%s: %s, retrying", source, type(exc).__name__)
-                await self._sleep(self._backoff * 2**attempt)
-                continue
-
-            if response.is_success:
-                self._cache.set(source, query, response.text)
+            response, failure, retryable = await self._attempt(url, all_params, headers)
+            if response is not None and response.is_success:
+                self._cache.set(source, cache_key, response.text)
                 return response.text
-            if response.status_code not in _RETRYABLE or last_attempt:
-                raise FetchError(f"{source}: HTTP {response.status_code}")
-            logger.warning("%s: HTTP %d, retrying", source, response.status_code)
-            delay = _retry_after(response)
+            if response is not None:
+                failure = f"HTTP {response.status_code}"
+                retryable = response.status_code in _RETRYABLE
+            if not retryable or last_attempt:
+                # Raised outside any `except`: no httpx error (and its URL) in __context__.
+                raise FetchError(f"{source}: {failure}")
+            logger.warning("%s: %s, retrying", source, failure)
+            delay = _retry_after(response) if response is not None else None
             await self._sleep(delay if delay is not None else self._backoff * 2**attempt)
         raise AssertionError("unreachable")  # pragma: no cover
+
+    async def _attempt(
+        self, url: str, params: Mapping[str, str], headers: Mapping[str, str] | None
+    ) -> tuple[httpx.Response | None, str, bool]:
+        """One request: (response, "", False) or (None, error type name, retryable)."""
+        try:
+            return await self._client.get(url, params=params, headers=headers), "", False
+        except httpx.TransportError as exc:
+            return None, type(exc).__name__, True
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
+            return None, type(exc).__name__, False
+
+
+def _host_of(url: str) -> str:
+    # raw_host is the ASCII (punycode) name actually sent, the form scope entries use.
+    return httpx.URL(url).raw_host.decode("ascii").lower().removesuffix(".")
+
+
+def _is_ip_literal(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True

@@ -178,7 +178,7 @@ async def test_secret_params_never_leak(
     (error,) = client_errors
     assert SECRET not in repr(error)
     assert error.__cause__ is None
-    assert error.__suppress_context__
+    assert error.__context__ is None
     assert SECRET not in caplog.text
 
 
@@ -215,4 +215,63 @@ async def test_idn_target_is_refused_whatever_its_spelling(tmp_path: Path) -> No
             with pytest.raises(PassiveViolationError):
                 await client.get_text("crtsh", url, query="q")
         await client.aclose()
+    assert not route.called
+
+
+@respx.mock
+async def test_cache_key_includes_url_and_non_secret_params(client: HttpClient) -> None:
+    # Review I3: two pages of the same logical query must not share a cache entry.
+    route = respx.get("https://web.archive.org/cdx")
+    route.side_effect = [httpx.Response(200, text="page1"), httpx.Response(200, text="page2")]
+    url = "https://web.archive.org/cdx"
+    assert await client.get_text("wayback", url, query="q", params={"page": "1"}) == "page1"
+    assert await client.get_text("wayback", url, query="q", params={"page": "2"}) == "page2"
+    assert await client.get_text("wayback", url, query="q", params={"page": "1"}) == "page1"
+    assert route.call_count == 2
+
+
+@respx.mock
+async def test_non_transport_httpx_errors_become_fetch_errors(client: HttpClient) -> None:
+    route = respx.get(URL)
+    route.side_effect = httpx.DecodingError(f"bad body for ?key={SECRET}")
+    with pytest.raises(FetchError, match="crtsh: DecodingError") as info:
+        await client.get_text("crtsh", URL, query="q", secret_params={"key": SECRET})
+    assert route.call_count == 1  # not retried
+    assert info.value.__context__ is None
+
+
+@respx.mock
+async def test_invalid_url_is_a_fetch_error(client: HttpClient) -> None:
+    route = respx.get(url__regex=r".*").respond(200)
+    with pytest.raises(FetchError, match="InvalidURL"):
+        await client.get_text("crtsh", "https://ex\x00ample.org/", query="q")
+    assert not route.called
+
+
+@respx.mock
+async def test_transport_error_leaves_no_exception_context(client: HttpClient) -> None:
+    respx.get(URL).side_effect = httpx.ConnectError(f"?key={SECRET}")
+    with pytest.raises(FetchError) as info:
+        await client.get_text("crtsh", URL, query="q")
+    assert info.value.__context__ is None  # the httpx error (and its URL) is not kept
+
+
+@respx.mock
+async def test_odd_retry_after_falls_back_to_backoff(client: HttpClient, rec: Recorder) -> None:
+    route = respx.get(URL)
+    route.side_effect = [
+        httpx.Response(429, headers=[(b"Retry-After", "\u00b2".encode("latin-1"))]),
+        httpx.Response(200, text="ok"),
+    ]
+    assert await client.get_text("crtsh", URL, query="q") == "ok"
+    assert rec.sleeps == [1.0]
+
+
+@respx.mock
+@pytest.mark.parametrize("url", ["https://192.0.2.10/", "https://[2001:db8::1]/"])
+async def test_ip_literal_hosts_are_refused(client: HttpClient, url: str) -> None:
+    # Every allowed third party is reached by name; an IP may well be the target's.
+    route = respx.get(url__regex=r".*").respond(200)
+    with pytest.raises(PassiveViolationError):
+        await client.get_text("crtsh", url, query="q")
     assert not route.called

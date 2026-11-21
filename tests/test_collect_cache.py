@@ -82,3 +82,12 @@ def test_persists_across_instances(tmp_path: Path, clock: FakeClock) -> None:
 def test_non_positive_ttl_is_refused(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="ttl"):
         ResponseCache(tmp_path / "c.sqlite", ttl=timedelta(0))
+
+
+def test_stale_rows_are_purged_on_open(tmp_path: Path, clock: FakeClock) -> None:
+    path = tmp_path / "cache.sqlite"
+    with ResponseCache(path, ttl=timedelta(hours=1), clock=clock) as first:
+        first.set("rdap", "example.com", "raw body")
+    clock.advance(hours=2)
+    with ResponseCache(path, ttl=timedelta(hours=1), clock=clock) as second:
+        assert second.purge_expired() == 0  # already removed when the cache was opened
