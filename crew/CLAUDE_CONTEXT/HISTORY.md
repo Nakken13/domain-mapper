@@ -65,3 +65,8 @@ Key files/commits: 69a6c82..HEAD on crew/batch-h. Standard review (Sonnet review
 Result: the demo GIF is a FICTIONAL `example.com` graph (the only authorized real target has one host), labelled as illustrative and regenerable by the script. Art. 323-1 penalties (3 years / EUR 100,000) are quoted from memory and could not be verified online: check Légifrance.
 Follow-ups: (1) `readme-badges` (TODO, batch I): badges blocked until the GitHub remote exists; (2) wire graph metrics into the report and expose Neo4j/dorks in the CLI; (3) `make_demo_report.py` imports the private `cli._default_rules` (a public `risk` helper would be sturdier).
 Tests: none — docs only; the one script was run by the AI during closure and passes ruff; the doc claims were checked against the code by the reviewer.
+
+## readme-badges — 2026-11-21
+What: CI, MIT license and Python 3.11+ badges at the top of `README.md` (commit 16d2b53 on crew/batch-i).
+Result: all badge URLs return 200. The CI badge showed "no status" right after the first run although the run succeeded (public repo, likely GitHub badge cache); user chose not to wait. The coverage badge was NOT added: CI publishes no coverage report (would need Codecov + token).
+Tests: none — docs only (README badges).
