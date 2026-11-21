@@ -3,24 +3,27 @@
     python evaluation/run_benchmark.py logan-villard.fr --tool-dir <dir with amass/subfinder> \
         --out evaluation/results
 
-Scope first: the domain must pass `scope.yaml` before anything is queried. Raw tool output is
-saved untouched, so scoring changes are recomputed offline (`--rescore`), never by re-querying.
+Scope first: the domain must pass `scope.yaml` before anything is queried, and the normalised
+domain it returns is the one every tool receives. Raw tool output, timings and errors are saved,
+so scoring changes are recomputed offline (`--rescore`), never by querying again.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
+import sys
 import time
 from datetime import date
+from functools import partial
 from pathlib import Path
 
 from surfacemap.cli import _collect
 from surfacemap.config import Settings
 from surfacemap.evaluation.benchmark import (
     TOOL_COMMANDS,
-    ToolNotInstalledError,
     ToolResult,
     compare,
     parse_subdomains,
@@ -28,19 +31,22 @@ from surfacemap.evaluation.benchmark import (
     subprocess_runner,
 )
 from surfacemap.evaluation.sources import subdomains_by_source
-from surfacemap.scope import Scope
+from surfacemap.scope import OutOfScopeError, Scope, ScopeFileError
+
+META = "results.json"  # {tool: {"seconds": float, "error": str | null}}
 
 
-def surfacemap_result(domain: str, scope_file: Path, raw_path: Path) -> ToolResult:
-    today = date.today()
-    scope = Scope.load(scope_file)
-    root = scope.require(domain, today=today)
+def surfacemap_result(root: str, scope: Scope, out: Path, today: date) -> ToolResult:
     start = time.monotonic()
     graph = asyncio.run(_collect(root, scope, Settings(), today))
     seconds = time.monotonic() - start
-    found = frozenset().union(*subdomains_by_source(graph, root).values())
-    raw_path.write_text("\n".join(sorted(found)) + "\n", encoding="utf-8")
-    return ToolResult("surfacemap", found, seconds, None)
+    by_source = subdomains_by_source(graph, root)
+    found = frozenset().union(*by_source.values())
+    raw = "\n".join(sorted(found)) + "\n"
+    # Which plugin saw what: the data behind the per-source counts for this run.
+    per_source = {source: sorted(fqdns) for source, fqdns in sorted(by_source.items())}
+    (out / "surfacemap-by-source.json").write_text(json.dumps(per_source, indent=2) + "\n")
+    return ToolResult("surfacemap", found, seconds, None, raw=raw)
 
 
 def table(results: list[ToolResult]) -> str:
@@ -57,45 +63,63 @@ def table(results: list[ToolResult]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> None:
+def save(results: list[ToolResult], out: Path) -> None:
+    meta = {r.name: {"seconds": r.seconds, "error": r.error} for r in results}
+    (out / META).write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    for r in results:
+        (out / f"{r.name}.txt").write_text(r.raw, encoding="utf-8")
+
+
+def rescored(root: str, out: Path) -> list[ToolResult]:
+    """Rebuild results from saved files only. Only tools listed in META count (no stale files)."""
+    meta = json.loads((out / META).read_text(encoding="utf-8"))
+    results = []
+    for name, info in meta.items():
+        raw = (out / f"{name}.txt").read_text(encoding="utf-8")
+        results.append(
+            ToolResult(name, parse_subdomains(raw, root), info["seconds"], info["error"], raw=raw)
+        )
+    return results
+
+
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("domain")
     ap.add_argument("--scope-file", type=Path, default=Path("scope.yaml"))
     ap.add_argument("--tool-dir", type=Path, help="directory holding the amass/subfinder binaries")
     ap.add_argument("--out", type=Path, default=Path("evaluation/results"))
-    ap.add_argument("--rescore", action="store_true", help="re-read saved raw outputs, no queries")
+    ap.add_argument("--rescore", action="store_true", help="re-read saved outputs, no queries")
     args = ap.parse_args()
+
+    today = date.today()
+    try:
+        scope = Scope.load(args.scope_file)
+        # Scope first, in every mode. `root` is the normalised domain used from here on.
+        root = scope.require(args.domain, today=today)
+    except ScopeFileError as exc:
+        print(f"ERROR {exc}", file=sys.stderr)
+        return 2
+    except OutOfScopeError as exc:
+        print(f"REFUSED {exc}", file=sys.stderr)
+        return 1
+
     args.out.mkdir(parents=True, exist_ok=True)
-
-    results: list[ToolResult] = []
     if args.rescore:
-        for raw in sorted(args.out.glob("*.txt")):
-            text = raw.read_text(encoding="utf-8")
-            results.append(ToolResult(raw.stem, parse_subdomains(text, args.domain), 0.0, None))
+        results = rescored(root, args.out)
     else:
+        search_path = os.environ.get("PATH", "")
         if args.tool_dir:
-            os.environ["PATH"] = f"{args.tool_dir}{os.pathsep}{os.environ['PATH']}"
-        results.append(surfacemap_result(args.domain, args.scope_file, args.out / "surfacemap.txt"))
-        for name in TOOL_COMMANDS:
-            captured: list[str] = []
-
-            def runner(argv: tuple[str, ...], _c: list[str] = captured) -> str:
-                try:
-                    out = subprocess_runner(argv)
-                except ToolNotInstalledError:
-                    raise
-                _c.append(out)
-                return out
-
-            result = run_tool(name, args.domain, runner)
-            if captured:
-                (args.out / f"{name}.txt").write_text(captured[0], encoding="utf-8")
-            results.append(result)
+            search_path = f"{args.tool_dir}{os.pathsep}{search_path}"
+        runner = partial(subprocess_runner, search_path=search_path)
+        results = [surfacemap_result(root, scope, args.out, today)]
+        results += [run_tool(name, root, runner) for name in TOOL_COMMANDS]
+        save(results, args.out)
 
     report = table(results)
     (args.out / "results.md").write_text(report, encoding="utf-8")
     print(report)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

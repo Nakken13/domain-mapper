@@ -16,19 +16,26 @@ from surfacemap.models import Domain
 SourceSets = Mapping[str, frozenset[str]]
 
 
+def is_subdomain(fqdn: str, apex: str) -> bool:
+    """True for a strict subdomain of `apex`.
+
+    The apex itself and look-alikes such as `notexample.com` are excluded: the suffix test
+    includes the leading dot. The one definition shared by the counts and the benchmark.
+    """
+    return fqdn.endswith(f".{apex}")
+
+
 def subdomains_by_source(graph: SurfaceGraph, apex: str) -> dict[str, frozenset[str]]:
     """Map each plugin to the in-scope subdomains of `apex` it saw.
 
-    The apex itself and look-alikes such as `notexample.com` are excluded: the suffix test
-    includes the leading dot. Sources that saw no subdomain are absent from the result.
+    Sources that saw no subdomain are absent from the result.
     """
-    suffix = f".{apex}"
     found: dict[str, set[str]] = defaultdict(set)
     for node in graph.nodes.values():
         entity = node.entity
         if not isinstance(entity, Domain) or not entity.in_scope:
             continue
-        if not entity.fqdn.endswith(suffix):
+        if not is_subdomain(entity.fqdn, apex):
             continue
         for source in node.sources:
             found[source].add(entity.fqdn)

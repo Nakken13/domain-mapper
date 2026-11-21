@@ -12,7 +12,9 @@ import shutil
 import subprocess
 import time
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from surfacemap.evaluation.sources import is_subdomain
 
 Runner = Callable[[tuple[str, ...]], str]
 Clock = Callable[[], float]
@@ -27,9 +29,19 @@ class ToolNotInstalledError(RuntimeError):
     """The external tool's binary is not on PATH."""
 
 
+class ToolFailedError(RuntimeError):
+    """The tool ran but exited non-zero: empty output then means failure, not "found nothing"."""
+
+    def __init__(self, returncode: int, stderr: str, stdout: str = "") -> None:
+        super().__init__(f"exited with status {returncode}: {stderr.strip()[:200]}")
+        self.returncode = returncode
+        self.stderr = stderr
+        self.stdout = stdout
+
+
 def _checked(domain: str) -> str:
     """Reject anything that is not a plain domain: it ends up in an argv, `-x` would be a flag."""
-    if not _DOMAIN_RE.match(domain):
+    if not _DOMAIN_RE.fullmatch(domain):
         raise ValueError(f"not a plain domain name: {domain!r}")
     return domain
 
@@ -55,6 +67,8 @@ class ToolResult:
     subdomains: frozenset[str]
     seconds: float
     error: str | None
+    # Raw stdout, kept so a run is never lost; not part of the result's identity.
+    raw: str = field(default="", compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -73,37 +87,56 @@ def parse_subdomains(text: str, apex: str) -> frozenset[str]:
     Same rules as the per-source counts: the apex itself, look-alikes (`notexample.com`),
     wildcards and junk are dropped, so tool noise cannot inflate a score.
     """
-    suffix = f".{apex}"
     found: set[str] = set()
     for line in text.splitlines():
         tokens = line.split()
         if not tokens:
             continue
         name = tokens[0].lower().rstrip(".")
-        if name.endswith(suffix) and _HOSTNAME_RE.match(name):
+        if is_subdomain(name, apex) and _HOSTNAME_RE.fullmatch(name):
             found.add(name)
     return frozenset(found)
 
 
-def subprocess_runner(argv: tuple[str, ...], timeout: float = 600.0) -> str:
-    """Run `argv` (no shell) and return stdout. Raises `ToolNotInstalledError` if absent."""
-    if shutil.which(argv[0]) is None:
+def subprocess_runner(
+    argv: tuple[str, ...], timeout: float = 600.0, search_path: str | None = None
+) -> str:
+    """Run `argv` (no shell) and return stdout.
+
+    `search_path` is where to look for the binary (default: PATH), so the caller never has to
+    mutate the process environment. Raises `ToolNotInstalledError` if absent and
+    `ToolFailedError` on a non-zero exit.
+    """
+    exe = shutil.which(argv[0], path=search_path)
+    if exe is None:
         raise ToolNotInstalledError(argv[0])
     done = subprocess.run(  # noqa: S603  (argv list, no shell, domain validated)
-        argv, capture_output=True, text=True, timeout=timeout, check=False
+        (exe, *argv[1:]), capture_output=True, text=True, timeout=timeout, check=False
     )
+    if done.returncode != 0:
+        raise ToolFailedError(done.returncode, done.stderr, done.stdout)
     return done.stdout
 
 
 def run_tool(name: str, domain: str, runner: Runner, clock: Clock = time.monotonic) -> ToolResult:
-    """Run one passive tool against `domain`, timing it. A missing binary is a result."""
+    """Run one passive tool against `domain`, timing it.
+
+    Every way a run can go wrong (missing binary, crash, timeout, OS error) is a result with
+    `error` set, never an exception: one failing tool must not lose the others' data.
+    """
     argv = TOOL_COMMANDS[name](domain)
     start = clock()
     try:
         output = runner(argv)
     except ToolNotInstalledError:
         return ToolResult(name, frozenset(), 0.0, f"{name} is not installed")
-    return ToolResult(name, parse_subdomains(output, domain), clock() - start, None)
+    except ToolFailedError as exc:
+        return ToolResult(name, frozenset(), clock() - start, f"{name} {exc}", raw=exc.stdout)
+    except subprocess.TimeoutExpired:
+        return ToolResult(name, frozenset(), clock() - start, f"{name} timed out")
+    except OSError as exc:
+        return ToolResult(name, frozenset(), clock() - start, f"{name} could not run: {exc}")
+    return ToolResult(name, parse_subdomains(output, domain), clock() - start, None, raw=output)
 
 
 def compare(results: Iterable[ToolResult]) -> list[Coverage]:

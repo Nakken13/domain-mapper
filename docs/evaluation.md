@@ -14,8 +14,9 @@ author, authorized in `scope.yaml`).
   (passive-only by design). No brute force, no zone transfer.
 - **Recall is relative.** No ground truth exists on a real target, so recall is measured against
   the union of what all tools found. It ranks tools; it does not measure the true surface.
-- Raw outputs are stored so scoring changes are recomputed offline (`--rescore`), never by
-  querying again.
+- Raw outputs, timings and errors are stored (`results.json`), so scoring changes are recomputed
+  offline (`--rescore`), never by querying again. A tool that exits non-zero, times out or is
+  missing is reported as failed (recall `n/a`), never as "found nothing".
 
 Versions: Subfinder v2.17.0, Amass v5.1.3, no API keys configured for any tool.
 
@@ -27,6 +28,12 @@ Versions: Subfinder v2.17.0, Amass v5.1.3, no API keys configured for any tool.
 | subfinder | 0 | 0 | 0 % | 25.9 |
 | amass | 0 | 0 | 0 % | 22.2 |
 
+Checked by hand that the two zeros are not failed invocations: both tools exit 0 and Amass
+v5.1.3 accepts `-passive` (its stdout is only the session banner). They are still degraded
+runs: with no API keys, Subfinder logs source errors even on a normal run (for example driftnet
+and reconeer answer 401, digitorus answers 403 behind a Cloudflare challenge). A keyed setup
+would likely find more, so these zeros bound what the tools do keyless, not what they can do.
+
 A first run the same day was discarded: crt.sh answered `502` (and Wayback `503`), so every
 tool was missing its main source. It is not part of the results.
 
@@ -35,9 +42,10 @@ tool was missing its main source. It is not part of the results.
 - **This benchmark does not discriminate.** crt.sh holds no certificate for the domain and the
   other passive sources add almost nothing, so the whole surface is one host. "1 vs 0" is not
   evidence that SurfaceMap has better coverage.
-- **Why SurfaceMap saw `www`.** Not confirmed which plugin; most likely it resolves the
-  domain's own records, which Subfinder and Amass in passive mode do not. If so, the difference
-  is a scope difference (own-record resolution), not source quality.
+- **Why SurfaceMap saw `www`.** Which plugin saw it was not recorded in this run (the driver now
+  saves `surfacemap-by-source.json` for future runs). A plausible cause is that SurfaceMap
+  resolves the domain's own records, which Subfinder and Amass in passive mode do not; that is
+  a hypothesis, not a finding. If true, the difference is one of scope, not source quality.
 - **Run time is not comparable.** One run each, network-dependent, tools started cold. Treat
   the times as order of magnitude only.
 - **What would make it meaningful:** a domain with dozens of subdomains and logged

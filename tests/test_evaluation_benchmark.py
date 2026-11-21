@@ -1,9 +1,11 @@
+import subprocess
 import sys
 
 import pytest
 
 from surfacemap.evaluation.benchmark import (
     TOOL_COMMANDS,
+    ToolFailedError,
     ToolNotInstalledError,
     ToolResult,
     compare,
@@ -11,6 +13,7 @@ from surfacemap.evaluation.benchmark import (
     run_tool,
     subprocess_runner,
 )
+from surfacemap.evaluation.sources import is_subdomain
 
 APEX = "example.com"
 
@@ -127,3 +130,69 @@ def test_tool_commands_refuse_a_domain_that_would_become_a_flag() -> None:
     for bad in ("-oA", "example.com; rm -rf /", "a b.com", ""):
         with pytest.raises(ValueError, match="plain domain"):
             TOOL_COMMANDS["amass"](bad)
+
+
+def test_run_tool_turns_a_timeout_into_an_error_result() -> None:
+    def runner(argv: tuple[str, ...]) -> str:
+        raise subprocess.TimeoutExpired(argv, 600)
+
+    result = run_tool("amass", APEX, runner, clock=lambda: 0.0)
+
+    assert result.subdomains == frozenset()
+    assert result.error is not None
+    assert "timed out" in result.error
+
+
+def test_run_tool_turns_an_os_error_into_an_error_result() -> None:
+    def runner(argv: tuple[str, ...]) -> str:
+        raise PermissionError("denied")
+
+    result = run_tool("amass", APEX, runner, clock=lambda: 0.0)
+
+    assert result.error is not None
+    assert "denied" in result.error
+
+
+def test_a_failed_run_is_an_error_not_zero_findings_and_keeps_its_output() -> None:
+    def runner(argv: tuple[str, ...]) -> str:
+        raise ToolFailedError(2, "flag provided but not defined", stdout="partial\n")
+
+    result = run_tool("subfinder", APEX, runner, clock=lambda: 0.0)
+
+    assert result.error == "subfinder exited with status 2: flag provided but not defined"
+    assert result.raw == "partial\n"
+    assert compare([result])[0].recall is None
+
+
+def test_run_tool_keeps_the_raw_stdout_without_it_affecting_equality() -> None:
+    result = run_tool("subfinder", APEX, lambda argv: "a.example.com\n", clock=lambda: 0.0)
+    assert result.raw == "a.example.com\n"
+    assert result == ToolResult("subfinder", frozenset({"a.example.com"}), 0.0, None)
+
+
+def test_subprocess_runner_raises_on_a_non_zero_exit() -> None:
+    code = "import sys; print('out'); sys.stderr.write('boom'); sys.exit(3)"
+    with pytest.raises(ToolFailedError) as info:
+        subprocess_runner((sys.executable, "-c", code))
+    assert info.value.returncode == 3
+    assert "boom" in info.value.stderr
+    assert info.value.stdout.strip() == "out"
+
+
+def test_subprocess_runner_looks_only_in_the_explicit_search_path(tmp_path) -> None:
+    name = "surfacemap-fake-tool" + (".exe" if sys.platform == "win32" else "")
+    # The binary is looked up only in the given directory, never in the ambient PATH.
+    with pytest.raises(ToolNotInstalledError):
+        subprocess_runner((name, "-d", APEX), search_path=str(tmp_path))
+
+
+def test_domain_check_rejects_a_trailing_newline() -> None:
+    with pytest.raises(ValueError, match="plain domain"):
+        TOOL_COMMANDS["amass"]("example.com\n")
+
+
+def test_is_subdomain_is_the_single_definition_used_by_both_modules() -> None:
+    assert is_subdomain("a.example.com", APEX)
+    assert not is_subdomain("example.com", APEX)
+    assert not is_subdomain("notexample.com", APEX)
+    assert not is_subdomain("a.example.com.evil.org", APEX)
