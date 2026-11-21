@@ -13,7 +13,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 
 ## Actions
 
-- [ ] docs(readme): Mermaid architecture diagram
+- [x] docs(readme): Mermaid architecture diagram
 - [ ] docs(readme): sources and their limits
 - [ ] docs(readme): methodology
 - [ ] docs(readme): ethics & legal section citing French Penal Code art. 323-1
