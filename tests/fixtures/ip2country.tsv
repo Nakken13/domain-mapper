@@ -1,0 +1,9 @@
+1.0.0.0	1.0.0.255	AU
+1.2.3.0	1.2.3.255	FR
+8.8.8.0	8.8.8.255	US
+9.9.9.0	9.9.9.255	None
+not-an-ip	1.0.0.1	XX
+10.0.0.0	10.0.0.255	toolong
+2606:4700::	2606:4700:ffff:ffff:ffff:ffff:ffff:ffff	US
+2a01:cb00::	2a01:cbff:ffff:ffff:ffff:ffff:ffff:ffff	fr
+1.2.4.0	2a01::	XX

@@ -28,7 +28,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(plugins): rdap (contacts dropped via privacy filters)
 - [x] feat(plugins): whois fallback
 - [x] feat(plugins): asn via Team Cymru DNS
-- [ ] feat(plugins): geoip (offline dataset, iptoasn/GeoLite2 - note licence)
+- [x] feat(plugins): geoip (offline dataset, iptoasn/GeoLite2 - note licence)
 - [x] feat(plugins): wayback CDX (no query strings kept)
 - [ ] feat(plugins): shodan (read-only, API key optional)
 - ~~feat(plugins): censys (read-only, API key optional)~~ dropped by the user 2026-11-21
