@@ -1,0 +1,166 @@
+"""Plugin contract, run context and registry.
+
+A plugin is any object matching the `Plugin` protocol (subclassing `PluginBase` only
+buys default methods). The engine calls `run` once per entity whose `kind` is in
+`consumes`; the plugin returns `Observation`s and never touches the graph.
+
+Scope policy is declared, not inferred:
+
+* `runs_out_of_scope` must be an explicit bool. Only pure DNS resolution says True: the
+  project rule is that out-of-scope nodes are recorded and DNS-resolved, never enriched.
+  An ASN lookup is enrichment even though it travels over DNS, so it says False.
+* `applies_to` narrows further, e.g. crt.sh/RDAP/WHOIS run on the scope root only.
+
+`name` is also the cache, rate-limit and provenance key, hence unique and slug-shaped.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import date
+from typing import Protocol, TypeVar, get_args, runtime_checkable
+
+from surfacemap.collect.cache import ResponseCache
+from surfacemap.collect.http import HttpClient
+from surfacemap.collect.ratelimit import RateLimiter
+from surfacemap.config import Settings
+from surfacemap.models import (
+    ASN,
+    ArchivedURL,
+    Certificate,
+    Domain,
+    Entity,
+    IPAddress,
+    Observation,
+    Technology,
+)
+from surfacemap.scope import InvalidDomainError, Scope, normalize_domain
+
+ENTITY_KINDS = frozenset(
+    get_args(model.model_fields["kind"].annotation)[0]
+    for model in (Domain, IPAddress, ASN, Certificate, Technology, ArchivedURL)
+)
+_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+
+
+class ScopeView:
+    """Read-only view of the scope, with the date pinned once for the whole run.
+
+    Pinning matters: `Scope.check` defaults to today, so a run crossing midnight past an
+    `expires` date would flip a domain to out-of-scope mid-run (and `False` wins merges).
+    """
+
+    def __init__(self, scope: Scope, today: date) -> None:
+        self._scope = scope
+        self.today = today
+
+    def is_in_scope(self, fqdn: str) -> bool:
+        return self._scope.check(fqdn, today=self.today).allowed
+
+    def root_of(self, fqdn: str) -> str | None:
+        """The authorized domain covering `fqdn`, or None when it is out of scope."""
+        decision = self._scope.check(fqdn, today=self.today)
+        return decision.entry.domain if decision.allowed and decision.entry else None
+
+    def is_target_host(self, host: str) -> bool:
+        """True for any name under a listed domain, even expired or restricted (fail closed).
+
+        Used to refuse direct HTTP traffic to the target: passive means never contacting it.
+        """
+        try:
+            name = normalize_domain(host)
+        except InvalidDomainError:
+            # e.g. `_dmarc.example.com`: not a valid hostname for scope, still the target.
+            name = host.strip().lower().removesuffix(".")
+        return any(name == e.domain or name.endswith("." + e.domain) for e in self._scope.entries)
+
+
+@dataclass(frozen=True)
+class PluginContext:
+    """What a plugin may use. Non-HTTP plugins (DNS, WHOIS) get the cache and limiter too."""
+
+    http: HttpClient
+    cache: ResponseCache
+    limiter: RateLimiter
+    settings: Settings
+    scope: ScopeView
+
+
+@runtime_checkable
+class Plugin(Protocol):
+    name: str
+    consumes: frozenset[str]
+    runs_out_of_scope: bool
+
+    def enabled(self, settings: Settings) -> bool:
+        """False when a requirement is missing (e.g. no API key): the plugin is skipped."""
+        ...
+
+    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
+        """Finer filter than `consumes`, e.g. only the scope root."""
+        ...
+
+    async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
+        """Observations about `entity`. Raising is allowed: the engine isolates failures."""
+        ...
+
+
+class PluginBase:
+    """Optional base class: always enabled, applies to every consumed entity."""
+
+    name: str
+    consumes: frozenset[str]
+    runs_out_of_scope: bool
+
+    def enabled(self, settings: Settings) -> bool:
+        return True
+
+    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
+        return True
+
+
+def _validate(plugin: Plugin) -> None:
+    if not isinstance(plugin, Plugin):
+        raise TypeError(f"{plugin!r} does not implement the Plugin protocol")
+    if not _NAME.match(plugin.name):
+        raise ValueError(f"plugin name {plugin.name!r} must be a lowercase slug")
+    if not plugin.consumes or not plugin.consumes <= ENTITY_KINDS:
+        raise ValueError(
+            f"{plugin.name}: consumes must be a non-empty subset of {sorted(ENTITY_KINDS)}"
+        )
+    if not isinstance(plugin.runs_out_of_scope, bool):
+        raise TypeError(f"{plugin.name}: runs_out_of_scope must be declared as a bool")
+
+
+P = TypeVar("P", bound=Plugin)
+
+
+class PluginRegistry:
+    def __init__(self) -> None:
+        self._plugins: dict[str, Plugin] = {}
+
+    def register(self, plugin: P) -> P:
+        _validate(plugin)
+        if plugin.name in self._plugins:
+            raise ValueError(f"plugin {plugin.name!r} is already registered")
+        self._plugins[plugin.name] = plugin
+        return plugin
+
+    def get(self, name: str) -> Plugin:
+        return self._plugins[name]
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._plugins
+
+    def __iter__(self) -> Iterator[Plugin]:
+        return iter(sorted(self._plugins.values(), key=lambda p: p.name))
+
+    def enabled(self, settings: Settings) -> list[Plugin]:
+        return [p for p in self if p.enabled(settings)]
+
+
+def default_registry() -> PluginRegistry:
+    """A fresh registry with the built-in plugins (none yet: added by the plugins phase)."""
+    return PluginRegistry()
