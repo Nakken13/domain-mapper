@@ -2,7 +2,6 @@
 
 Tasks not started yet. Start = move the file to `crew/CURRENT_TASKS/` (see `CLAUDE.md`).
 
-- [collection-engine](collection-engine.md)
 - [evaluation](evaluation.md)
 - [graph-export](graph-export.md)
 - [html-report](html-report.md)
