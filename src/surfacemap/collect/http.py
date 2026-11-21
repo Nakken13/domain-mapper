@@ -9,7 +9,8 @@ Guarantees enforced here rather than trusted to each plugin:
 * **Honest identity**: a fixed `SurfaceMap/<version>` User-Agent, no browser spoofing.
 * **Rate limits**: every attempt, retries included, spends a token of its source.
 * **Cache**: keyed by the logical query + URL + non-secret params; a hit spends no
-  token and sends nothing. Only 2xx bodies are stored.
+  token and sends nothing. Only 2xx bodies are stored, after the caller's `redact`
+  (personal data in RDAP vCards, certificate emails…) so the raw body never hits disk.
 * **Secrets**: `secret_params` (e.g. an API key the provider wants in the URL) are added
   to the request only. They never reach the cache key, an error message, a chained
   exception or the httpx request log (silenced below INFO level, where it prints URLs).
@@ -86,11 +87,14 @@ class HttpClient:
         params: Mapping[str, str] | None = None,
         secret_params: Mapping[str, str] | None = None,
         headers: Mapping[str, str] | None = None,
+        redact: Callable[[str], str] | None = None,
     ) -> str:
         """GET `url` for plugin `source`.
 
         `query` is the logical query (as in `Provenance.query`). The cache key is that
         query plus the URL and the non-secret params, so pages of one query never collide.
+        `redact` rewrites a 2xx body before it is cached and returned; if it raises, nothing
+        is cached.
         """
         try:
             host = _host_of(url)
@@ -117,8 +121,9 @@ class HttpClient:
                 failure, retryable = type(exc).__name__, False
             else:
                 if response.is_success:
-                    self._cache.set(source, cache_key, response.text)
-                    return response.text
+                    body = redact(response.text) if redact else response.text
+                    self._cache.set(source, cache_key, body)
+                    return body
                 failure = f"HTTP {response.status_code}"
                 retryable = response.status_code in _RETRYABLE
                 delay = _retry_after(response)

@@ -275,3 +275,35 @@ async def test_ip_literal_hosts_are_refused(client: HttpClient, url: str) -> Non
     with pytest.raises(PassiveViolationError):
         await client.get_text("crtsh", url, query="q")
     assert not route.called
+
+
+@respx.mock
+async def test_redact_runs_before_the_cache_stores_the_body(
+    client: HttpClient, cache: ResponseCache
+) -> None:
+    route = respx.get(URL).respond(200, text="owner=jane@example.org")
+
+    def redact(body: str) -> str:
+        return body.replace("jane@example.org", "[x]")
+
+    first = await client.get_text("rdap", URL, query="q", redact=redact)
+    second = await client.get_text("rdap", URL, query="q", redact=redact)
+
+    assert first == second == "owner=[x]"
+    assert route.call_count == 1  # the second call is a cache hit
+    # Nothing in the SQLite file holds the raw value.
+    rows = cache._db.execute("SELECT body FROM responses").fetchall()
+    assert rows
+    assert all("jane" not in body for (body,) in rows)
+
+
+@respx.mock
+async def test_failing_redact_caches_nothing(client: HttpClient, cache: ResponseCache) -> None:
+    respx.get(URL).respond(200, text="raw")
+
+    def redact(body: str) -> str:
+        raise ValueError("unparseable")
+
+    with pytest.raises(ValueError, match="unparseable"):
+        await client.get_text("rdap", URL, query="q", redact=redact)
+    assert cache.get("rdap", '["q", "https://crt.sh/", []]') is None
