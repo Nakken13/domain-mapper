@@ -15,7 +15,7 @@ Zone: `src/surfacemap/collect/`, `src/surfacemap/plugins/base.py`, `tests/`
 
 Zone: `src/surfacemap/plugins/`, `tests/fixtures/`, `tests/`
 
-- `passive-plugins.md`
+- ~~`passive-plugins.md`~~
 
 ## Batch D
 
