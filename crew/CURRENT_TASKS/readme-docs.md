@@ -16,7 +16,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] docs(readme): Mermaid architecture diagram
 - [x] docs(readme): sources and their limits
 - [x] docs(readme): methodology
-- [ ] docs(readme): ethics & legal section citing French Penal Code art. 323-1
+- [x] docs(readme): ethics & legal section citing French Penal Code art. 323-1
 - [ ] docs(media): demo GIF of the report
 - [ ] docs(readme): badges (CI, coverage, licence, python) - blocked until GitHub remote exists
 - [ ] docs(readme): improvement ideas

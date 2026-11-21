@@ -67,3 +67,23 @@ invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sour
    does not discriminate: see [docs/evaluation.md](docs/evaluation.md).
 
 More: [docs/methodology.md](docs/methodology.md).
+
+## Ethics & legal
+
+- **Authorization first.** Only map domains you own or hold written permission to assess. In France,
+  fraudulently accessing or remaining in an automated data processing system is an offence under
+  **Code pénal art. 323-1** (up to three years' imprisonment and a EUR 100,000 fine at the time of
+  writing; check [Légifrance](https://www.legifrance.gouv.fr/) for the current text). Probing a
+  system you are not authorized to test can fall under it, even with good intentions.
+- **Enforced, not just advised.** `scope.yaml` lists authorized domains with an optional expiry;
+  every entry point goes through `scope.py`, and an out-of-scope domain is refused before any
+  network object is created.
+- **Passive by construction.** No port scan, no bruteforce, no HTTP request to the target or its
+  subdomains (the HTTP client raises `PassiveViolationError`). Out-of-scope names met on the way, such
+  as a CDN CNAME target, are recorded and DNS-resolved, never enriched.
+- **No personal data.** Registrant contacts, emails and individual names are filtered out before the
+  cache and the graph (`privacy.py`).
+- **Third-party terms.** Shodan data stays Shodan's (credit it, respect your plan); Google dorks are
+  generated as links and never run automatically; crt.sh, Team Cymru and WHOIS servers are rate-limited.
+- **Findings are leads.** A takeover finding is inferred from DNS only; verify and report responsibly
+  to the domain owner. This section is engineering context, not legal advice.
