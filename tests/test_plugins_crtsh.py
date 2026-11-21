@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import hashlib
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -15,6 +16,7 @@ from surfacemap.models import Certificate, Domain, IPAddress, RelationType
 from surfacemap.plugins import crtsh
 from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
 from surfacemap.plugins.crtsh import CRTSH_URL, CrtshPlugin
+from surfacemap.scope import Scope, ScopeEntry
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 
@@ -174,6 +176,35 @@ async def test_downloads_valid_certificates_and_links_their_names(
     bodies = [b for (b,) in plugin_ctx.cache._db.execute("SELECT body FROM responses")]
     assert hashlib.sha256(DER).hexdigest() in bodies
     assert not any("BEGIN CERTIFICATE" in b for b in bodies)
+
+
+@respx.mock
+async def test_secured_by_edges_only_for_in_scope_hosts(plugin_ctx: PluginContext) -> None:
+    view = ScopeView(
+        Scope([ScopeEntry(domain="example.com", include_subdomains=False, authorization="t")]),
+        plugin_ctx.scope.today,
+    )
+    ctx = dataclasses.replace(plugin_ctx, scope=view)
+    mock_crtsh(
+        [
+            {
+                "id": 7,
+                "issuer_name": "CN=Test CA",
+                "name_value": "example.com\nstaging.example.com",
+                "not_before": "2026-05-01T00:00:00",
+                "not_after": "2026-08-01T00:00:00",
+            }
+        ]
+    )
+    mock_pem(7, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+
+    domains, cert = await CrtshPlugin().run(ROOT, ctx)
+
+    assert {e.id: e.in_scope for e in domains.entities} == {
+        "domain:example.com": True,
+        "domain:staging.example.com": False,
+    }
+    assert [r.source for r in cert.relations] == ["domain:example.com"]
 
 
 def row(cert_id: int, not_before: str, not_after: str) -> dict[str, object]:

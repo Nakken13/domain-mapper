@@ -131,7 +131,8 @@ class CrtshPlugin(PluginBase):
         except (FetchError, ValueError) as exc:  # ValidationError is a ValueError
             logger.warning("crtsh: skipped certificate %s: %s", candidate.id, type(exc).__name__)
             return None
-        hosts = sorted({_host(san) for san in candidate.sans})
+        # Same policy as wayback: an out-of-scope host is recorded, never enriched.
+        hosts = sorted({h for san in candidate.sans if ctx.scope.is_in_scope(h := _host(san))})
         return Observation(
             provenance=_provenance(self.name, query),
             entities=(certificate,),
