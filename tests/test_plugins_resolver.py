@@ -143,3 +143,14 @@ async def test_other_resolver_failures_become_dns_errors() -> None:
 def test_default_resolver_uses_the_system_configuration() -> None:
     resolver = DnspythonResolver()
     assert resolver.timeout > 0
+
+
+def test_the_os_configuration_is_only_read_on_first_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import dns.asyncresolver
+
+    built: list[object] = []
+    monkeypatch.setattr(dns.asyncresolver, "Resolver", lambda: built.append(1) or object())
+    DnspythonResolver()
+    assert built == []  # creating the registry must not touch the OS resolver config

@@ -10,7 +10,8 @@ its `_dmarc` TXT. That label is built here from an already-validated name and ne
 becomes a node: the policy is stored on the domain as a `DMARC` record. A `DMARC` record
 with an empty value is a *confirmed* absence (NXDOMAIN or no `v=DMARC1` TXT) and is only
 recorded for a scope root: a subdomain falls back to its organizational domain's policy
-(RFC 7489 section 6.6.3). A failed lookup records nothing. DKIM is not looked up: finding keys means guessing selectors.
+(RFC 7489 section 6.6.3). A failed lookup records nothing.
+DKIM is not looked up: finding keys means guessing selectors.
 
 An IP is linked to the name that owns its A/AAAA record, i.e. the end of the CNAME chain,
 so an address behind an out-of-scope CDN stays out of scope. When the answer is NXDOMAIN,

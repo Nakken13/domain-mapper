@@ -86,17 +86,18 @@ class DnspythonResolver:
         self, resolver: dns.asyncresolver.Resolver | None = None, timeout: float = 5.0
     ) -> None:
         self.timeout = timeout
-        if resolver is None:
-            resolver = dns.asyncresolver.Resolver()
-            resolver.lifetime = timeout
-        self._resolver = resolver
+        self._resolver = resolver  # built lazily: creating one reads the OS configuration
+
+    def _get(self) -> dns.asyncresolver.Resolver:
+        if self._resolver is None:
+            self._resolver = dns.asyncresolver.Resolver()
+            self._resolver.lifetime = self.timeout
+        return self._resolver
 
     async def resolve(self, name: str, rtype: str) -> DnsAnswer:
         try:
             # No search list: `www` must never be completed with the host's own domain.
-            answer = await self._resolver.resolve(
-                name, rtype, raise_on_no_answer=False, search=False
-            )
+            answer = await self._get().resolve(name, rtype, raise_on_no_answer=False, search=False)
         except dns.resolver.NXDOMAIN as exc:
             responses = list(exc.responses().values())
             return answer_from_message(responses[0]) if responses else DnsAnswer("NXDOMAIN")

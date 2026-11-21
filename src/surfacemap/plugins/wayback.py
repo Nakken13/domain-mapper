@@ -14,6 +14,7 @@ the body is reduced to those cut URLs before the response cache.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import unicodedata
 from datetime import UTC, datetime
@@ -34,6 +35,8 @@ from surfacemap.models import (
 from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
 from surfacemap.privacy import REDACTED_EMAIL, scrub_emails, strip_query
 from surfacemap.scope import InvalidDomainError, normalize_domain
+
+logger = logging.getLogger(__name__)
 
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
 CDX_LIMIT = 10_000
@@ -72,7 +75,10 @@ class WaybackPlugin(PluginBase):
             },
             redact=partial(_minimize, root),
         )
-        spans = _spans(root, _rows(body))
+        rows = _rows(body)
+        if len(rows) >= CDX_LIMIT:  # the server stops at the limit: older captures are missing
+            logger.warning("wayback: %s truncated at CDX_LIMIT=%d rows", root, CDX_LIMIT)
+        spans = _spans(root, rows)
         if not spans:
             return []
         hosts = {host: Domain(fqdn=host, in_scope=ctx.scope.is_in_scope(host)) for host, _ in spans}

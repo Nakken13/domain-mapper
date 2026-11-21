@@ -76,6 +76,23 @@ async def test_emits_archived_paths_without_query_strings(
 
 
 @respx.mock
+async def test_a_truncated_archive_is_logged(
+    plugin_ctx: PluginContext, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr("surfacemap.plugins.wayback.CDX_LIMIT", 2)
+    mock_cdx(
+        [
+            ["timestamp", "original"],
+            ["20240101000000", "https://example.com/a"],
+            ["20240102000000", "https://example.com/b"],
+        ]
+    )
+    with caplog.at_level("WARNING"):
+        await WaybackPlugin().run(ROOT, plugin_ctx)
+    assert "CDX_LIMIT" in caplog.text or "truncated" in caplog.text
+
+
+@respx.mock
 async def test_empty_archive_means_no_observation(plugin_ctx: PluginContext) -> None:
     mock_cdx([])
     assert await WaybackPlugin().run(ROOT, plugin_ctx) == []

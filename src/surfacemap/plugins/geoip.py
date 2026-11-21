@@ -14,6 +14,7 @@ plugin is the only source of `IPAddress.country`.
 
 from __future__ import annotations
 
+import asyncio
 import bisect
 import gzip
 import ipaddress
@@ -89,7 +90,7 @@ class GeoipPlugin(PluginBase):
     def enabled(self, settings: Settings) -> bool:
         return self._path(settings) is not None
 
-    def _ranges(self, settings: Settings) -> dict[int, _Ranges] | None:
+    async def _ranges(self, settings: Settings) -> dict[int, _Ranges] | None:
         """The parsed dataset, loaded on first use and kept for the run."""
         if self.dataset in self._loaded:  # explicit path: kept even if the file goes away
             return self._loaded[self.dataset]
@@ -97,13 +98,13 @@ class GeoipPlugin(PluginBase):
         if path is None:
             return None
         if path not in self._loaded:
-            self._loaded[path] = _load(path)
+            self._loaded[path] = await asyncio.to_thread(_load, path)
         return self._loaded[path]
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, IPAddress):
             return []
-        ranges = self._ranges(ctx.settings)
+        ranges = await self._ranges(ctx.settings)
         if ranges is None:
             return []
         address = ipaddress.ip_address(entity.address)

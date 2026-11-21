@@ -61,6 +61,7 @@ class SocketTransport:
                     answer += chunk
             finally:
                 writer.close()
+                await writer.wait_closed()
         return answer.decode("utf-8", "replace")
 
 
