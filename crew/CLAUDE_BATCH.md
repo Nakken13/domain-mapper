@@ -10,4 +10,4 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 Zone: `src/surfacemap/tui/`, `src/surfacemap/banner.py`, `tests/`, `pyproject.toml`, `README.md`
 
-- `tui-menu.md`
+- ~~`tui-menu.md`~~
