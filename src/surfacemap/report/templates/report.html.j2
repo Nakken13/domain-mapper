@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SurfaceMap report - {{ domain }}</title>
+<style>
+:root { color-scheme: light dark; --fg: #1b1f24; --bg: #ffffff; --muted: #59636e; --line: #d0d7de; }
+@media (prefers-color-scheme: dark) { :root { --fg: #e6edf3; --bg: #0d1117; --muted: #9198a1; --line: #30363d; } }
+body { margin: 0; padding: 16px; font: 16px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+main { max-width: 72rem; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+.meta { color: var(--muted); margin: 0 0 1.5rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Attack surface of {{ domain }}</h1>
+<p class="meta">{{ node_count }} nodes, {{ edge_count }} relations, {{ findings|length }} findings. Passive sources only.</p>
+{% for finding in findings %}
+<section>
+<h2>{{ finding.title }}</h2>
+<p>{{ finding.rationale }}</p>
+</section>
+{% endfor %}
+</main>
+</body>
+</html>
