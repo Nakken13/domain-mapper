@@ -133,4 +133,10 @@ def test_reads_dmarc_from_a_domain() -> None:
     # Confirmed absence vs. never looked up / lookup failed.
     assert dmarc_of(with_records(DnsRecord(type="DMARC", value=""))) == "absent"
     assert dmarc_of(with_records()) is None
+    # More than one DMARC record: RFC 7489 section 6.6.3 discards them all.
+    two = (
+        DnsRecord(type="DMARC", value="v=DMARC1; p=none"),
+        DnsRecord(type="DMARC", value="v=DMARC1; p=reject"),
+    )
+    assert dmarc_of(with_records(*two)) == "invalid"
     assert dmarc_of(with_records(DnsRecord(type="DMARC", value="v=DMARC1; p=bad"))) == "invalid"

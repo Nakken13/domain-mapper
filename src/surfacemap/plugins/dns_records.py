@@ -8,8 +8,9 @@ recorded and DNS-resolved, never enriched), and there it asks A/AAAA only. In-sc
 also get MX, NS and TXT; a scope root, or an in-scope name with a mail server, also gets
 its `_dmarc` TXT. That label is built here from an already-validated name and never
 becomes a node: the policy is stored on the domain as a `DMARC` record. A `DMARC` record
-with an empty value is a *confirmed* absence (NXDOMAIN or no `v=DMARC1` TXT); a failed
-lookup records nothing. DKIM is not looked up: finding keys means guessing selectors.
+with an empty value is a *confirmed* absence (NXDOMAIN or no `v=DMARC1` TXT) and is only
+recorded for a scope root: a subdomain falls back to its organizational domain's policy
+(RFC 7489 section 6.6.3). A failed lookup records nothing. DKIM is not looked up: finding keys means guessing selectors.
 
 An IP is linked to the name that owns its A/AAAA record, i.e. the end of the CNAME chain,
 so an address behind an out-of-scope CDN stays out of scope. When the answer is NXDOMAIN,
@@ -135,23 +136,31 @@ class DnsPlugin(PluginBase):
         query = f"{name} {'/'.join(types)}"
         if in_scope and (ctx.scope.root_of(name) == name or collected.has_mail_server(name)):
             query += " +_dmarc"
-            dmarc = await self._dmarc(name, ctx)
-            if dmarc is not None:
-                collected.records[name].add(dmarc)
+            is_root = ctx.scope.root_of(name) == name
+            collected.records[name].update(await self._dmarc(name, is_root, ctx))
         if collected.empty():
             return []
         return [self._observation(name, query, collected, ctx)]
 
-    async def _dmarc(self, name: str, ctx: PluginContext) -> DnsRecord | None:
+    async def _dmarc(self, name: str, is_root: bool, ctx: PluginContext) -> list[DnsRecord]:
+        """DMARC records of `name`; a confirmed absence only for a scope root.
+
+        A subdomain without its own `_dmarc` falls back to the organizational domain's
+        policy (RFC 7489 section 6.6.3), so its absence proves nothing: no record, which
+        `dmarc_of` reads as unknown. Every `v=DMARC1` TXT is kept: several make the
+        policy invalid, which `dmarc_of` reports.
+        """
         answer = await self._query(f"_dmarc.{name}", "TXT", ctx)
         if answer is None:
-            return None
+            return []
         policies = sorted(
             r.value
             for r in answer.records
             if r.type == "TXT" and r.value.strip().lower().startswith("v=dmarc1")
         )
-        return DnsRecord(type="DMARC", value=policies[0] if policies else "")
+        if policies:
+            return [DnsRecord(type="DMARC", value=value) for value in policies]
+        return [DnsRecord(type="DMARC", value="")] if is_root else []
 
     def _observation(
         self, name: str, query: str, collected: _Collected, ctx: PluginContext

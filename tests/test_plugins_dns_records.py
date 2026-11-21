@@ -142,9 +142,11 @@ async def test_the_root_gets_mail_records_and_dmarc(plugin_ctx: PluginContext) -
     assert observation.provenance.query == "example.com A/AAAA/MX/NS/TXT +_dmarc"
 
 
-async def test_a_name_with_mx_gets_dmarc_and_a_confirmed_absence_is_recorded(
+async def test_a_subdomain_without_its_own_dmarc_is_not_reported_absent(
     plugin_ctx: PluginContext,
 ) -> None:
+    # RFC 7489 section 6.6.3: the receiver falls back to the organizational domain's policy,
+    # so a missing `_dmarc.shop` says nothing about the effective policy.
     resolver = FakeResolver(
         {
             ("shop.example.com", "MX"): DnsAnswer(
@@ -154,7 +156,36 @@ async def test_a_name_with_mx_gets_dmarc_and_a_confirmed_absence_is_recorded(
         }
     )
     [observation] = await run(resolver, "shop.example.com", plugin_ctx)
-    assert domain(observation, "shop.example.com").records == (DnsRecord(type="DMARC", value=""),)
+    assert domain(observation, "shop.example.com").records == ()
+
+
+async def test_a_root_without_dmarc_is_a_confirmed_absence(plugin_ctx: PluginContext) -> None:
+    resolver = FakeResolver(
+        {
+            ("example.com", "A"): DnsAnswer("NOERROR", (rr("example.com", "A", "192.0.2.1"),)),
+            ("_dmarc.example.com", "TXT"): DnsAnswer("NXDOMAIN"),
+        }
+    )
+    [observation] = await run(resolver, "example.com", plugin_ctx)
+    assert DnsRecord(type="DMARC", value="") in domain(observation, "example.com").records
+
+
+async def test_several_dmarc_records_are_all_kept(plugin_ctx: PluginContext) -> None:
+    resolver = FakeResolver(
+        {
+            ("example.com", "A"): DnsAnswer("NOERROR", (rr("example.com", "A", "192.0.2.1"),)),
+            ("_dmarc.example.com", "TXT"): DnsAnswer(
+                "NOERROR",
+                (
+                    rr("_dmarc.example.com", "TXT", "v=DMARC1; p=none"),
+                    rr("_dmarc.example.com", "TXT", "v=DMARC1; p=reject"),
+                ),
+            ),
+        }
+    )
+    [observation] = await run(resolver, "example.com", plugin_ctx)
+    values = {r.value for r in domain(observation, "example.com").records if r.type == "DMARC"}
+    assert values == {"v=DMARC1; p=none", "v=DMARC1; p=reject"}
 
 
 async def test_a_failed_dmarc_lookup_records_nothing(plugin_ctx: PluginContext) -> None:

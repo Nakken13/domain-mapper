@@ -138,5 +138,7 @@ def dmarc_of(domain: Domain) -> DmarcPolicy | Literal["absent", "invalid"] | Non
     published = [v for v in values if v]
     if not published:
         return "absent"
+    if len(published) > 1:  # RFC 7489 section 6.6.3: several records are discarded
+        return "invalid"
     policy = parse_dmarc(published[0])
     return policy if policy is not None else "invalid"
