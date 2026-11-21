@@ -163,3 +163,19 @@ async def test_cached_body_holds_only_cut_urls(
         for leak in ("utm_source", "jane.doe", "next=", "reset", "partner.example.net", "mailto"):
             assert leak not in body
         assert "https://www.example.com/login" in body
+
+
+@respx.mock
+async def test_emails_in_paths_never_reach_the_cache(plugin_ctx: PluginContext) -> None:
+    mock_cdx(
+        [
+            ["timestamp", "original"],
+            ["20200101000000", "https://example.com/unsubscribe/jane.doe@example.org"],
+            ["20200101000000", "https://example.com/u/john.roe%40example.org/profile"],
+        ]
+    )
+    [observation] = await WaybackPlugin().run(ROOT, plugin_ctx)
+    for (body,) in plugin_ctx.cache._db.execute("SELECT body FROM responses"):
+        assert "jane.doe" not in body
+        assert "john.roe" not in body
+    assert "jane.doe" not in observation.model_dump_json()

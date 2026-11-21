@@ -31,7 +31,7 @@ from surfacemap.models import (
     RelationType,
 )
 from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
-from surfacemap.privacy import strip_query
+from surfacemap.privacy import scrub_emails, strip_query
 from surfacemap.scope import InvalidDomainError, normalize_domain
 
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
@@ -140,7 +140,8 @@ def _location(root: str, original: str) -> tuple[str, str] | None:
         return None
     if host != root and not host.endswith("." + root):
         return None
-    return host, _PATH_CUT.split(parts.path, maxsplit=1)[0] or "/"
+    # Emails in a path (`/unsubscribe/jane@…`) are scrubbed here, before the cache.
+    return host, scrub_emails(_PATH_CUT.split(parts.path, maxsplit=1)[0]) or "/"
 
 
 def _spans(root: str, rows: list[Any]) -> dict[tuple[str, str], _Span]:
