@@ -9,7 +9,7 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 Zone: `src/surfacemap/risk/`, `tests/`
 
-- `risk-rules.md`
+- ~~`risk-rules.md`~~
 
 ## Batch E
 
