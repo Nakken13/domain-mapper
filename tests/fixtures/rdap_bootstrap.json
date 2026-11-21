@@ -1,0 +1,11 @@
+{
+  "description": "Hand-made excerpt of the IANA RDAP DNS bootstrap file (RFC 9224 shape)",
+  "publication": "2026-05-01T00:00:00Z",
+  "services": [
+    [["net", "com"], ["http://rdap.verisign.example/com/v1/", "https://rdap.verisign.example/com/v1/"]],
+    ["malformed"],
+    [["fr"], ["https://rdap.nic.example/"]],
+    [["org"], ["http://rdap.only-http.example/"]]
+  ],
+  "version": "1.0"
+}

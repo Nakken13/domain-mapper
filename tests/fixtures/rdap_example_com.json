@@ -1,0 +1,29 @@
+{
+  "objectClassName": "domain",
+  "ldhName": "EXAMPLE.COM",
+  "status": ["client transfer prohibited"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "1995-08-14T04:00:00Z"},
+    {"eventAction": "expiration", "eventDate": "2027-08-13T04:00:00Z"}
+  ],
+  "nameservers": [
+    {"objectClassName": "nameserver", "ldhName": "A.IANA-SERVERS.NET"},
+    {"objectClassName": "nameserver", "ldhName": "b.iana-servers.net."},
+    {"objectClassName": "nameserver", "ldhName": "not a hostname"},
+    "not-an-object",
+    {"objectClassName": "nameserver"}
+  ],
+  "secureDNS": {"delegationSigned": true},
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "roles": ["registrant"],
+      "vcardArray": ["vcard", [
+        ["fn", {}, "text", "Jane Synthetic-Doe"],
+        ["email", {}, "text", "jane.synthetic@example.org"],
+        ["tel", {}, "uri", "tel:+33.100000000"]
+      ]]
+    }
+  ],
+  "remarks": [{"description": ["Contact Jane Synthetic-Doe for abuse"]}]
+}

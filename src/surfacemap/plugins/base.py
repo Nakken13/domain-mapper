@@ -201,9 +201,10 @@ def default_registry() -> PluginRegistry:
     # Imported here: plugin modules import this one.
     from surfacemap.plugins.crtsh import CrtshPlugin
     from surfacemap.plugins.dns_records import DnsPlugin
+    from surfacemap.plugins.rdap import RdapPlugin
     from surfacemap.plugins.wayback import WaybackPlugin
 
     registry = PluginRegistry()
-    for plugin in (CrtshPlugin(), DnsPlugin(), WaybackPlugin()):
+    for plugin in (CrtshPlugin(), DnsPlugin(), RdapPlugin(), WaybackPlugin()):
         registry.register(plugin)
     return registry
