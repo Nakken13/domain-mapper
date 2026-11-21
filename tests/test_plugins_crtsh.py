@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -8,7 +10,8 @@ import pytest
 import respx
 
 from surfacemap.collect.http import FetchError
-from surfacemap.models import Domain, IPAddress
+from surfacemap.models import Certificate, Domain, IPAddress, RelationType
+from surfacemap.plugins import crtsh
 from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
 from surfacemap.plugins.crtsh import CRTSH_URL, CrtshPlugin
 
@@ -38,6 +41,7 @@ async def test_emits_subdomains_seen_in_certificates(
     plugin_ctx: PluginContext, load_fixture: Callable[[str], Any]
 ) -> None:
     route = mock_crtsh(load_fixture("crtsh_example.json"))
+    respx.get(CRTSH_URL).respond(404)  # certificate downloads: covered below
 
     [observation] = await CrtshPlugin().run(ROOT, plugin_ctx)
 
@@ -92,6 +96,7 @@ async def test_cached_body_holds_no_email_and_only_needed_fields(
     plugin_ctx: PluginContext, load_fixture: Callable[[str], Any]
 ) -> None:
     mock_crtsh(load_fixture("crtsh_example.json"))
+    respx.get(CRTSH_URL).respond(404)
     await CrtshPlugin().run(ROOT, plugin_ctx)
 
     rows = plugin_ctx.cache._db.execute("SELECT body FROM responses").fetchall()
@@ -100,3 +105,115 @@ async def test_cached_body_holds_no_email_and_only_needed_fields(
         assert "jane.doe" not in body
         assert "serial_number" not in body
         assert "www.example.com" in body  # the name after the dropped email survives
+
+
+def mock_pem(cert_id: int, body: str, status: int = 200) -> respx.Route:
+    return respx.get(CRTSH_URL, params={"d": str(cert_id)}).respond(status, text=body)
+
+
+DER = b"synthetic-der-bytes-for-tests-only"
+
+
+@respx.mock
+async def test_downloads_valid_certificates_and_links_their_names(
+    plugin_ctx: PluginContext, load_fixture: Callable[[str], Any]
+) -> None:
+    mock_crtsh(load_fixture("crtsh_example.json"))
+    pem = load_fixture("crtsh_cert.pem")
+    routes = [mock_pem(cert_id, pem) for cert_id in (1000000001, 1000000002, 1000000003)]
+
+    domains, *certs = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert all(route.call_count == 1 for route in routes)
+    assert len(domains.entities) == 4
+    assert [o.provenance.query for o in certs] == [
+        "crt.sh id 1000000001",
+        "crt.sh id 1000000002",
+        "crt.sh id 1000000003",
+    ]
+    [cert] = certs[1].entities
+    assert isinstance(cert, Certificate)
+    assert cert.sha256 == hashlib.sha256(DER).hexdigest()
+    assert cert.issuer == "C=US, O=Let's Encrypt, CN=R11"
+    assert cert.not_before == datetime(2026, 4, 1, 9, tzinfo=UTC)
+    assert cert.not_after == datetime(2026, 6, 30, 9, tzinfo=UTC)
+    assert cert.sans == ("*.dev.example.com", "api.example.com")
+    assert sorted((r.source, r.type) for r in certs[1].relations) == [
+        ("domain:api.example.com", RelationType.SECURED_BY),
+        ("domain:dev.example.com", RelationType.SECURED_BY),
+    ]
+    # The S/MIME certificate keeps only its hostname, never the email.
+    [smime] = certs[2].entities
+    assert isinstance(smime, Certificate)
+    assert smime.sans == ("www.example.com",)
+    # Only the fingerprint is cached: the DER may embed email SANs.
+    bodies = [b for (b,) in plugin_ctx.cache._db.execute("SELECT body FROM responses")]
+    assert hashlib.sha256(DER).hexdigest() in bodies
+    assert not any("BEGIN CERTIFICATE" in b for b in bodies)
+
+
+def row(cert_id: int, not_before: str, not_after: str) -> dict[str, object]:
+    return {
+        "id": cert_id,
+        "issuer_name": "CN=Test CA",
+        "name_value": f"c{cert_id}.example.com",
+        "not_before": not_before,
+        "not_after": not_after,
+    }
+
+
+@respx.mock
+async def test_skips_expired_and_future_certificates(plugin_ctx: PluginContext) -> None:
+    # The run date is pinned to 2026-06-01 (scope view).
+    mock_crtsh(
+        [
+            row(1, "2025-01-01T00:00:00", "2025-04-01T00:00:00"),
+            row(2, "2026-07-01T00:00:00", "2026-10-01T00:00:00"),
+            row(3, "not-a-date", "2026-10-01T00:00:00"),
+            row(4, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+        ]
+    )
+    valid = mock_pem(4, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+
+    domains, cert = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert valid.call_count == 1
+    assert len(domains.entities) == 4  # every name is still recorded
+    assert cert.provenance.query == "crt.sh id 4"
+
+
+@respx.mock
+async def test_caps_downloads_to_the_newest_certificates(
+    plugin_ctx: PluginContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(crtsh, "MAX_CERTIFICATES", 1)
+    mock_crtsh(
+        [
+            row(1, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+            row(2, "2026-05-20T00:00:00", "2026-08-01T00:00:00"),
+        ]
+    )
+    newest = mock_pem(2, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+
+    _, cert = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert newest.call_count == 1
+    assert cert.provenance.query == "crt.sh id 2"
+
+
+@respx.mock
+async def test_a_bad_certificate_download_is_skipped(plugin_ctx: PluginContext) -> None:
+    mock_crtsh(
+        [
+            row(1, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+            row(2, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+            row(3, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+        ]
+    )
+    mock_pem(1, "", status=404)
+    mock_pem(2, "<html>not a certificate</html>")
+    mock_pem(3, "-----BEGIN CERTIFICATE-----\n!!!\n-----END CERTIFICATE-----\n")
+
+    [domains] = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert len(domains.entities) == 3
