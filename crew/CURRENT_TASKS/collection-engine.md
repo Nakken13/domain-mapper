@@ -11,7 +11,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 
 ## Actions
 
-- [ ] feat(collect): SQLite response cache with TTL (key = source + query)
+- [x] feat(collect): SQLite response cache with TTL (key = source + query)
 - [ ] feat(collect): per-source token-bucket rate limiter
 - [ ] feat(collect): httpx async client with retries and honest User-Agent
 - [ ] feat(plugins): Plugin Protocol + registry (`plugins/base.py`)
