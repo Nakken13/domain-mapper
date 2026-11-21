@@ -4,6 +4,7 @@ Exit codes for `scope check` and `scan`: 0 ok, 1 refused (out of scope), 2 unusa
 """
 
 import asyncio
+import sys
 from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
@@ -31,7 +32,6 @@ from domain_mapper.scope import OutOfScopeError, Scope, ScopeFileError
 
 app = typer.Typer(
     help="Passive attack-surface mapping, restricted to domains listed in scope.yaml.",
-    no_args_is_help=True,
 )
 scope_app = typer.Typer(help="Inspect the authorization scope.", no_args_is_help=True)
 app.add_typer(scope_app, name="scope")
@@ -48,8 +48,13 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit
 
 
-@app.callback()
+def _stdin_is_tty() -> bool:
+    return sys.stdin.isatty()
+
+
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Annotated[
         bool,
         typer.Option(
@@ -57,7 +62,18 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """domain-mapper: passive sources only, authorized domains only."""
+    """domain-mapper: passive sources only, authorized domains only.
+
+    Without a command: opens the interactive menu on a terminal, otherwise prints this help.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+    if _stdin_is_tty():
+        from domain_mapper import tui  # late import: the menu imports this module
+
+        tui.main()
+        return
+    typer.echo(ctx.get_help())
 
 
 @scope_app.command("check")

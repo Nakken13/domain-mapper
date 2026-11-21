@@ -61,3 +61,28 @@ def test_module_entry_point_exposes_app() -> None:
     import domain_mapper.__main__ as main_module
 
     assert main_module.app is app
+
+
+def test_no_args_on_a_terminal_opens_the_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened: list[bool] = []
+    monkeypatch.setattr("domain_mapper.cli._stdin_is_tty", lambda: True)
+    monkeypatch.setattr("domain_mapper.tui.main", lambda: opened.append(True))
+    result = runner.invoke(app, [])
+    assert result.exit_code == 0
+    assert opened == [True]
+
+
+def test_no_args_without_a_terminal_shows_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("domain_mapper.cli._stdin_is_tty", lambda: False)
+    result = runner.invoke(app, [])
+    assert "Usage" in result.output
+    assert "scan" in result.output
+
+
+def test_subcommand_never_opens_the_menu(
+    scope_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("domain_mapper.cli._stdin_is_tty", lambda: True)
+    monkeypatch.setattr("domain_mapper.tui.main", lambda: pytest.fail("menu opened"))
+    result = runner.invoke(app, ["scope", "check", "logan-villard.fr", "-s", str(scope_file)])
+    assert result.exit_code == 0

@@ -48,11 +48,12 @@ The report is a single self-contained HTML file (Cytoscape.js inlined): open it 
 
 ## Menu (TUI)
 
-Prefer a menu to flags? `domain-mapper-tool` opens a numbered menu (banner, scope check, scan, open the last
-report). It needs an interactive terminal and the same `scope.yaml` in the current directory.
+Prefer a menu to flags? Running `domain-mapper` with no command opens a numbered menu (banner, scope check,
+scan, open the last report); `domain-mapper-tool` is an alias. It needs an interactive terminal and the same
+`scope.yaml` in the current directory. Without a terminal (pipe, CI), plain `domain-mapper` prints the help.
 
 ```bash
-domain-mapper-tool
+domain-mapper
 ```
 
 | Key | Action |
