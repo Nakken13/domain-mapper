@@ -85,7 +85,8 @@ class HttpClient:
         headers: Mapping[str, str] | None = None,
     ) -> str:
         """GET `url` for plugin `source`; `query` is the logical cache key (no secret)."""
-        host = (httpx.URL(url).host or "").lower().removesuffix(".")
+        # raw_host is the ASCII (punycode) name actually sent, the form scope entries use.
+        host = httpx.URL(url).raw_host.decode("ascii").lower().removesuffix(".")
         if self._is_forbidden_host(host):
             raise PassiveViolationError(f"{source}: refused to contact the target host {host}")
 

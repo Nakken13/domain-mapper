@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import httpx
@@ -191,3 +191,19 @@ async def test_secret_params_are_not_part_of_the_cache_key(
         "shodan", "https://api.shodan.io/x", query="example.org", secret_params={"key": SECRET}
     )
     assert SECRET.encode() not in (tmp_path / "c.sqlite").read_bytes()
+
+
+@respx.mock
+async def test_idn_target_is_refused_whatever_its_spelling(tmp_path: Path) -> None:
+    from surfacemap.plugins.base import ScopeView
+    from surfacemap.scope import Scope, ScopeEntry
+
+    view = ScopeView(Scope([ScopeEntry(domain="bücher.example", authorization="x")]), date.today())
+    route = respx.get(url__regex=r".*").respond(200)
+    with ResponseCache(tmp_path / "idn.sqlite", ttl=timedelta(hours=1)) as cache:
+        client = HttpClient(RateLimiter({}), cache, view.is_target_host)
+        for url in ("https://www.bücher.example/", "https://www.xn--bcher-kva.example/"):
+            with pytest.raises(PassiveViolationError):
+                await client.get_text("crtsh", url, query="q")
+        await client.aclose()
+    assert not route.called
