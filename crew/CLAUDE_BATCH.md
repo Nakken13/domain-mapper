@@ -33,6 +33,12 @@ Zone: `evaluation/`, `docs/`
 
 Zone: `README.md`, `docs/`, `media/`
 
-- `readme-docs.md`
+- ~~`readme-docs.md`~~
+
+## Batch I
+
+Zone: `README.md`
+
+- `readme-badges.md`
 
 Note: phases are sequential (see `Depends on:` in each task); only one batch is active at a time, which is why the shared `tests/` and `docs/` zones do not violate the disjointness invariant. Never start a phase while another is in `CURRENT_TASKS/`.
