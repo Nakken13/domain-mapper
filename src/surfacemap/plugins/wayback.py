@@ -7,7 +7,8 @@ Query strings, fragments, path parameters (`;jsessionid=`) and encoded `;`/`?`/`
 (tokens, emails, session ids) are dropped before anything is built, so captures of one
 path merge into one `ArchivedURL` whose first/last seen span every capture. Hosts
 outside the root are dropped; out-of-scope hosts under it are recorded as bare domains,
-without their paths. Only HTTP 200 captures are requested, capped at `CDX_LIMIT` rows.
+without their paths. Only HTTP 200 captures are requested, capped at `CDX_LIMIT` rows;
+the body is reduced to those cut URLs before the response cache.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -67,6 +69,7 @@ class WaybackPlugin(PluginBase):
                 "filter": "statuscode:200",
                 "limit": str(CDX_LIMIT),
             },
+            redact=partial(_minimize, root),
         )
         spans = _spans(root, _rows(body))
         if not spans:
@@ -100,6 +103,21 @@ def _rows(body: str) -> list[Any]:
     if not isinstance(rows, list):
         raise FetchError("wayback: unexpected payload")
     return rows[1:]  # the first row is the field header
+
+
+def _minimize(root: str, body: str) -> str:
+    """Rows reduced to `[timestamp, https://host/cut-path]` under `root`, before the cache.
+
+    The raw CDX body holds full original URLs (query strings with tokens or emails): it
+    must never reach the disk. Running `_spans` on the result gives the same spans.
+    """
+    kept: list[list[str]] = [["timestamp", "original"]]
+    for row in _rows(body):
+        capture = _capture(row)
+        location = capture and _location(root, capture[1])
+        if capture and location:
+            kept.append([row[0], f"https://{location[0]}{location[1]}"])
+    return json.dumps(kept)
 
 
 def _capture(row: object) -> tuple[datetime, str] | None:

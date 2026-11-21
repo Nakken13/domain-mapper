@@ -149,3 +149,17 @@ async def test_out_of_scope_hosts_are_recorded_but_not_enriched(
     assert isinstance(staging, Domain)
     assert staging.in_scope is False
     assert [r.target for r in observation.relations] == ["url:example.com/home"]
+
+
+@respx.mock
+async def test_cached_body_holds_only_cut_urls(
+    plugin_ctx: PluginContext, load_fixture: Callable[[str], Any]
+) -> None:
+    mock_cdx(load_fixture("wayback_example.json"))
+    await WaybackPlugin().run(ROOT, plugin_ctx)
+    bodies = [b for (b,) in plugin_ctx.cache._db.execute("SELECT body FROM responses")]
+    assert bodies
+    for body in bodies:
+        for leak in ("utm_source", "jane.doe", "next=", "reset", "partner.example.net", "mailto"):
+            assert leak not in body
+        assert "https://www.example.com/login" in body
