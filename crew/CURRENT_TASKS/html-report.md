@@ -12,7 +12,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 ## Actions
 
 - [x] feat(report): self-contained Jinja2 template
-- [ ] feat(report): interactive graph with Cytoscape.js inlined (MIT, no CDN; keep licence notice)
+- [x] feat(report): interactive graph with Cytoscape.js inlined (MIT, no CDN; keep licence notice)
 - [ ] feat(report): findings table by severity
 - [ ] feat(cli): `surfacemap scan` command end-to-end (scope.require first)
 - [ ] test(report): visual check at desktop + mobile width (human validation; PAUSED/ if needed)
