@@ -1,0 +1,39 @@
+{
+  "_note": "Hand-built from the documented /shodan/host/{ip} shape; no real Shodan data.",
+  "ip_str": "1.2.3.4",
+  "asn": "AS64500",
+  "org": "Example SAS",
+  "country_code": "FR",
+  "hostnames": ["www.example.com", "host-4.provider.example.net", "bad_host.example.com"],
+  "domains": ["example.com", "provider.example.net"],
+  "ports": [22, 443, 25],
+  "data": [
+    {
+      "port": 443,
+      "transport": "tcp",
+      "product": "nginx",
+      "version": "1.25.3",
+      "hostnames": ["www.example.com"],
+      "http": {"html": "<a href=\"mailto:webmaster@example.com\">contact</a>"}
+    },
+    {
+      "port": 22,
+      "transport": "tcp",
+      "product": "OpenSSH",
+      "hostnames": ["host-4.provider.example.net"]
+    },
+    {
+      "port": 25,
+      "transport": "tcp",
+      "data": "220 mail ESMTP postmaster: jane.synthetic@example.org",
+      "hostnames": ["www.example.com"]
+    },
+    {
+      "port": 8080,
+      "transport": "tcp",
+      "product": "Apache httpd",
+      "hostnames": ["www.example.com"]
+    },
+    "not-a-banner"
+  ]
+}

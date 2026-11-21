@@ -204,6 +204,7 @@ def default_registry() -> PluginRegistry:
     from surfacemap.plugins.dns_records import DnsPlugin
     from surfacemap.plugins.geoip import GeoipPlugin
     from surfacemap.plugins.rdap import RdapPlugin
+    from surfacemap.plugins.shodan import ShodanPlugin
     from surfacemap.plugins.wayback import WaybackPlugin
     from surfacemap.plugins.whois import WhoisPlugin
 
@@ -214,6 +215,7 @@ def default_registry() -> PluginRegistry:
         DnsPlugin(),
         GeoipPlugin(),
         RdapPlugin(),
+        ShodanPlugin(),
         WaybackPlugin(),
         WhoisPlugin(),
     )
