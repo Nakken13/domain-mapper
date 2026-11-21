@@ -27,7 +27,7 @@ Zone: `src/surfacemap/report/`, `src/surfacemap/cli.py`, `tests/`
 
 Zone: `evaluation/`, `docs/`
 
-- `evaluation.md`
+- ~~`evaluation.md`~~
 
 ## Batch H
 
