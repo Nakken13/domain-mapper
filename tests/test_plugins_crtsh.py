@@ -104,7 +104,7 @@ async def test_cached_body_holds_no_email_and_only_needed_fields(
     assert rows
     for (body,) in rows:
         assert "jane.doe" not in body
-        assert "serial_number" not in body
+        assert "issuer_ca_id" not in body
         assert "www.example.com" in body  # the name after the dropped email survives
 
 
@@ -243,3 +243,18 @@ async def test_downloads_stop_at_their_time_budget_and_keep_results(
 
     assert len(domains.entities) == 2  # the subdomains survive the cut
     assert cert.provenance.query == "crt.sh id 1"
+
+
+@respx.mock
+async def test_a_precertificate_and_its_certificate_count_once(plugin_ctx: PluginContext) -> None:
+    precert = {**row(10, "2026-05-01T00:00:00", "2026-08-01T00:00:00"), "serial_number": "0abc"}
+    leaf = {**row(11, "2026-05-01T00:00:00", "2026-08-01T00:00:00"), "serial_number": "0abc"}
+    other = {**row(12, "2026-05-01T00:00:00", "2026-08-01T00:00:00"), "serial_number": "0def"}
+    mock_crtsh([precert, leaf, other])
+    pem = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n"
+    routes = {cert_id: mock_pem(cert_id, pem) for cert_id in (10, 11, 12)}
+
+    _, *certs = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert sorted(o.provenance.query for o in certs) == ["crt.sh id 11", "crt.sh id 12"]
+    assert routes[10].call_count == 0

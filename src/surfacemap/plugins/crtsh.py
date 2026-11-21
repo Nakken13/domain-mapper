@@ -50,7 +50,9 @@ DOWNLOAD_BUDGET = 60.0
 timeout there would discard the whole call, subdomains included."""
 
 _IDENTITY_FIELDS = ("common_name", "name_value")
-_KEPT_FIELDS = frozenset({"id", "issuer_name", "not_before", "not_after", *_IDENTITY_FIELDS})
+_KEPT_FIELDS = frozenset(
+    {"id", "issuer_name", "serial_number", "not_before", "not_after", *_IDENTITY_FIELDS}
+)
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +228,10 @@ def _timestamp(value: object) -> datetime | None:
 
 def _valid_certificates(root: str, rows: list[dict[str, Any]], today: date) -> list[_Candidate]:
     """Certificates valid on `today`, newest first, capped at `MAX_CERTIFICATES`."""
-    candidates: dict[int, _Candidate] = {}
-    for row in rows:
+    # A precertificate and its certificate are two rows (two ids) with one issuer+serial:
+    # one issuance, downloaded once. The higher id, usually the final certificate, wins.
+    candidates: dict[object, _Candidate] = {}
+    for row in sorted(rows, key=lambda r: r.get("id") if isinstance(r.get("id"), int) else 0):
         cert_id, issuer = row.get("id"), row.get("issuer_name")
         not_before, not_after = _timestamp(row.get("not_before")), _timestamp(row.get("not_after"))
         sans = _sans(root, row)
@@ -236,6 +240,8 @@ def _valid_certificates(root: str, rows: list[dict[str, Any]], today: date) -> l
         if not_before is None or not_after is None:
             continue
         if not_before.date() <= today <= not_after.date():
-            candidates[cert_id] = _Candidate(cert_id, issuer, not_before, not_after, sans)
+            serial = row.get("serial_number")
+            key = (issuer, serial) if isinstance(serial, str) and serial else cert_id
+            candidates[key] = _Candidate(cert_id, issuer, not_before, not_after, sans)
     newest = sorted(candidates.values(), key=lambda c: (c.not_before, c.id), reverse=True)
     return newest[:MAX_CERTIFICATES]
