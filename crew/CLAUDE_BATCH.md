@@ -9,7 +9,7 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 Zone: `src/surfacemap/collect/`, `src/surfacemap/plugins/base.py`, `tests/`
 
-- `collection-engine.md`
+- ~~`collection-engine.md`~~
 
 ## Batch C
 
