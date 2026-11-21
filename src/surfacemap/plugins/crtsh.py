@@ -108,7 +108,9 @@ class CrtshPlugin(RootOnlyPlugin):
                     if certificate is not None:
                         observations.append(certificate)
         except TimeoutError:
-            logger.warning("crtsh: certificate downloads cut after %ss", DOWNLOAD_BUDGET)
+            logger.warning(
+                "crtsh: out of time budget (%ss), certificate downloads cut", DOWNLOAD_BUDGET
+            )
         return observations
 
     async def _download(self, candidate: _Candidate, ctx: PluginContext) -> Observation | None:

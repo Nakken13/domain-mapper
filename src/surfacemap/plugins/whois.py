@@ -13,6 +13,7 @@ name servers are cached.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 from typing import Protocol
@@ -59,7 +60,8 @@ class SocketTransport:
                     answer += chunk
             finally:
                 writer.close()
-                await writer.wait_closed()
+                with contextlib.suppress(OSError):  # a reset after the answer loses nothing
+                    await writer.wait_closed()
         return answer.decode("utf-8", "replace")
 
 
