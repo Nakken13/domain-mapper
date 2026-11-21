@@ -12,7 +12,7 @@ from importlib.resources import files
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models import Finding
+from surfacemap.models import Finding, Severity
 from surfacemap.report.graphdata import graph_elements, to_script_json
 
 _VENDOR = files("surfacemap.report") / "vendor"
@@ -25,6 +25,14 @@ _ENV = Environment(
 )
 
 
+_RANK = {severity: rank for rank, severity in enumerate(Severity)}
+
+
+def _worst_first(findings: Sequence[Finding]) -> list[Finding]:
+    """Triage order: highest severity first; ties keep a stable, readable order."""
+    return sorted(findings, key=lambda f: (-_RANK[f.severity], f.rule_id, f.evidence))
+
+
 def render_report(graph: SurfaceGraph, findings: Sequence[Finding], *, domain: str) -> str:
     """Return the report as a single HTML string with no external resource."""
     elements = graph_elements(graph)
@@ -32,7 +40,7 @@ def render_report(graph: SurfaceGraph, findings: Sequence[Finding], *, domain: s
         domain=domain,
         node_count=len(elements["nodes"]),
         edge_count=len(elements["edges"]),
-        findings=list(findings),
+        findings=_worst_first(findings),
         graph_json=to_script_json(elements),
         # Vendored, version-pinned and hash-checked by tests: trusted, rendered with |safe.
         cytoscape_js=(_VENDOR / "cytoscape.min.js").read_text(encoding="utf-8"),

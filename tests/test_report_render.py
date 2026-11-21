@@ -43,3 +43,27 @@ def test_report_escapes_untrusted_finding_text() -> None:
     html = _html(_finding(title="<script>alert(1)</script>"))
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+
+
+def test_findings_are_listed_worst_severity_first() -> None:
+    html = _html(
+        _finding(severity=Severity.LOW, title="Low one"),
+        _finding(severity=Severity.CRITICAL, title="Critical one"),
+        _finding(severity=Severity.MEDIUM, title="Medium one"),
+    )
+    positions = [html.index(t) for t in ("Critical one", "Medium one", "Low one")]
+    assert positions == sorted(positions)
+
+
+def test_findings_table_shows_severity_as_text_evidence_and_fix() -> None:
+    html = _html(_finding(remediation="Remove the record."))
+    assert "<table" in html
+    assert ">critical<" in _html(_finding(severity=Severity.CRITICAL)).lower()
+    assert "domain:app.example.com" in html
+    assert "Remove the record." in html
+
+
+def test_report_without_findings_says_so_instead_of_an_empty_table() -> None:
+    html = _html()
+    assert "No findings" in html
+    assert "<table" not in html
