@@ -3,7 +3,7 @@
 Traffic: one HTTPS GET to `web.archive.org` (the Internet Archive CDX API, a third
 party) per scope root, `url=<root>&matchType=domain`. Nothing is sent to the target.
 
-Query strings, fragments, path parameters (`;jsessionid=`) and percent-encoded `?`/`#`
+Query strings, fragments, path parameters (`;jsessionid=`) and encoded `;`/`?`/`#`/`%`
 (tokens, emails, session ids) are dropped before anything is built, so captures of one
 path merge into one `ArchivedURL` whose first/last seen span every capture. Hosts
 outside the root are dropped; out-of-scope hosts under it are recorded as bare domains,
@@ -35,9 +35,10 @@ from surfacemap.scope import InvalidDomainError, normalize_domain
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
 CDX_LIMIT = 10_000
 _TIMESTAMP = "%Y%m%d%H%M%S"
-# Path parameters (`;jsessionid=…`) and percent-encoded `?`/`#` smuggle the same
-# secrets as a query string past `strip_query`: the path is cut at the first one.
-_PATH_CUT = re.compile(r";|%3f|%23", re.IGNORECASE)
+# Path parameters (`;jsessionid=…`) and percent-encoded `;`/`?`/`#` smuggle the same
+# secrets as a query string past `strip_query`: the path is cut at the first one. An
+# encoded `%` (`%25`) can only hide another escape (`%253F`), so it cuts too (fail closed).
+_PATH_CUT = re.compile(r";|%3b|%3f|%23|%25", re.IGNORECASE)
 
 _Span = tuple[datetime, datetime]
 

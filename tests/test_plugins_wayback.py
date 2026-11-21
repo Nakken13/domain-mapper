@@ -107,11 +107,13 @@ async def test_path_parameters_and_encoded_delimiters_are_cut(plugin_ctx: Plugin
             ["20200101000000", "https://example.com/dl%3Ftoken=SECRET2"],
             ["20200101000000", "https://example.com/doc%23SECRET3"],
             ["20200101000000", "https://example.com/;SECRET4"],
+            ["20200101000000", "https://example.com/p%3Bsid=SECRET5"],
+            ["20200101000000", "https://example.com/q%253Ftoken=SECRET6"],
         ]
     )
     [observation] = await WaybackPlugin().run(ROOT, plugin_ctx)
     paths = sorted(e.path for e in observation.entities if isinstance(e, ArchivedURL))
-    assert paths == ["/", "/app", "/dl", "/doc"]
+    assert paths == ["/", "/app", "/dl", "/doc", "/p", "/q"]
     assert "SECRET" not in observation.model_dump_json()
 
 
