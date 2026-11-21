@@ -20,7 +20,8 @@ src/surfacemap/
   privacy.py            personal-data filters (whois contacts, emails, query strings)
   models/               pydantic entities, relations, observations, findings
   collect/              async engine, httpx client, rate limiter, SQLite cache
-  plugins/              one passive source per module (crtsh, dns, rdap_whois, asn_geo, wayback, shodan, censys, dorks)
+  plugins/              one passive source per module (crtsh, dns_records, rdap, whois, asn, geoip,
+                        wayback, shodan); mailauth = SPF/DMARC parsers, dorks = link builder
   graph/                observation merge, NetworkX / Neo4j export, centrality metrics
   risk/                 rule engine, one explainable rule per file in rules/
   report/               self-contained HTML report (Jinja2 + inlined Cytoscape.js)

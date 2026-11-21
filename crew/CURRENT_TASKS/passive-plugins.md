@@ -33,5 +33,5 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(plugins): shodan (read-only, API key optional)
 - ~~feat(plugins): censys (read-only, API key optional)~~ dropped by the user 2026-11-21
 - [x] feat(plugins): dorks generator (reuse/optional dependency on sibling project dorkint; never executes searches)
-- [ ] docs(plugins): verify each module docstring states the traffic it emits
+- [x] docs(plugins): verify each module docstring states the traffic it emits
 - [ ] Review + merge branch into main
