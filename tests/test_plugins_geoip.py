@@ -9,6 +9,7 @@ import pytest
 
 from surfacemap.config import Settings
 from surfacemap.models import Domain, IPAddress
+from surfacemap.plugins import geoip
 from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
 from surfacemap.plugins.geoip import DATASET_NAMES, GeoipPlugin
 
@@ -91,3 +92,22 @@ async def test_a_missing_dataset_gives_nothing(plugin_ctx: PluginContext, tmp_pa
 async def test_ignores_entities_that_are_not_ips(plugin_ctx: PluginContext) -> None:
     domain = Domain(fqdn="example.com", in_scope=True)
     assert await GeoipPlugin(DATASET).run(domain, plugin_ctx) == []
+
+
+async def test_the_default_dataset_is_parsed_once(
+    plugin_ctx: PluginContext, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shutil.copy(DATASET, tmp_path / DATASET_NAMES[0])
+    ctx = replace(plugin_ctx, settings=Settings(_env_file=None, cache_dir=tmp_path))
+    calls: list[Path] = []
+    real_load = geoip._load
+
+    def counting_load(path: Path) -> object:
+        calls.append(path)
+        return real_load(path)
+
+    monkeypatch.setattr(geoip, "_load", counting_load)
+    plugin = GeoipPlugin()
+    for address in ("1.2.3.4", "8.8.8.8", "1.0.0.1"):
+        await plugin.run(IPAddress(address=address), ctx)
+    assert len(calls) == 1

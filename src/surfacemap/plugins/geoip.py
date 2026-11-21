@@ -91,10 +91,14 @@ class GeoipPlugin(PluginBase):
 
     def _ranges(self, settings: Settings) -> dict[int, _Ranges] | None:
         """The parsed dataset, loaded on first use and kept for the run."""
-        loaded = self._loaded.get(self.dataset) if self.dataset else None
-        if loaded is None and (path := self._path(settings)) is not None:
-            loaded = self._loaded.setdefault(path, _load(path))
-        return loaded
+        if self.dataset in self._loaded:  # explicit path: kept even if the file goes away
+            return self._loaded[self.dataset]
+        path = self._path(settings)
+        if path is None:
+            return None
+        if path not in self._loaded:
+            self._loaded[path] = _load(path)
+        return self._loaded[path]
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, IPAddress):
