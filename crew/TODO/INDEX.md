@@ -3,5 +3,4 @@
 Tasks not started yet. Start = move the file to `crew/CURRENT_TASKS/` (see `CLAUDE.md`).
 
 - [evaluation](evaluation.md)
-- [html-report](html-report.md)
 - [readme-docs](readme-docs.md)
