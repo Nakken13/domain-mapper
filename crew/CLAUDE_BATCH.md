@@ -21,7 +21,7 @@ Zone: `src/surfacemap/graph/` (except `src/surfacemap/graph/builder.py`), `docke
 
 Zone: `src/surfacemap/report/`, `src/surfacemap/cli.py`, `tests/`
 
-- `html-report.md`
+- ~~`html-report.md`~~
 
 ## Batch G
 
