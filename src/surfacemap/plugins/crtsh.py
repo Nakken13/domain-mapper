@@ -41,7 +41,11 @@ class CrtshPlugin(PluginBase):
         root = entity.fqdn
         query = f"%.{root}"
         body = await ctx.http.get_text(
-            self.name, CRTSH_URL, query=query, params={"q": query, "output": "json"}
+            self.name,
+            CRTSH_URL,
+            query=query,
+            params={"q": query, "output": "json"},
+            redact=_minimize,
         )
         rows = _rows(body)
         names = sorted(_names_under(root, rows))
@@ -69,10 +73,33 @@ def _rows(body: str) -> list[Any]:
     return rows
 
 
-def _identities(row: object) -> Iterable[str]:
-    if not isinstance(row, dict):
-        return
-    for key in ("common_name", "name_value"):
+_IDENTITY_FIELDS = ("common_name", "name_value")
+_KEPT_FIELDS = frozenset({"id", "issuer_name", "not_before", "not_after", *_IDENTITY_FIELDS})
+
+
+def _minimize(body: str) -> str:
+    """The crt.sh payload reduced to the fields used here, email identities removed.
+
+    Runs before the response cache: S/MIME certificates list personal emails, and the raw
+    body must never reach disk. Structural, not a regex over the JSON text, so the name
+    following an email in a multi-line `name_value` survives.
+    """
+    kept: list[dict[str, Any]] = []
+    for row in _rows(body):
+        if not isinstance(row, dict):
+            continue
+        fields = {k: v for k, v in row.items() if k in _KEPT_FIELDS and isinstance(v, str | int)}
+        for key in _IDENTITY_FIELDS:
+            value = fields.get(key)
+            if isinstance(value, str):
+                fields[key] = "\n".join(x for x in value.splitlines() if "@" not in x)
+        kept.append(fields)
+    return json.dumps(kept)
+
+
+def _identities(row: dict[str, Any]) -> Iterable[str]:
+    """Names of a row already passed through `_minimize` (no email left)."""
+    for key in _IDENTITY_FIELDS:
         value = row.get(key)
         if isinstance(value, str):
             yield from value.splitlines()
@@ -82,8 +109,6 @@ def _names_under(root: str, rows: list[Any]) -> set[str]:
     names: set[str] = set()
     for row in rows:
         for identity in _identities(row):
-            if "@" in identity:
-                continue  # an email (S/MIME), i.e. personal data
             try:
                 name = normalize_domain(identity.strip().removeprefix("*."))
             except InvalidDomainError:

@@ -85,3 +85,18 @@ def test_is_a_built_in_plugin() -> None:
 
 async def test_ignores_entities_that_are_not_domains(plugin_ctx: PluginContext) -> None:
     assert await CrtshPlugin().run(IPAddress(address="192.0.2.1"), plugin_ctx) == []
+
+
+@respx.mock
+async def test_cached_body_holds_no_email_and_only_needed_fields(
+    plugin_ctx: PluginContext, load_fixture: Callable[[str], Any]
+) -> None:
+    mock_crtsh(load_fixture("crtsh_example.json"))
+    await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    rows = plugin_ctx.cache._db.execute("SELECT body FROM responses").fetchall()
+    assert rows
+    for (body,) in rows:
+        assert "jane.doe" not in body
+        assert "serial_number" not in body
+        assert "www.example.com" in body  # the name after the dropped email survives
