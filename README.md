@@ -35,3 +35,20 @@ flowchart LR
 Plugins never touch the graph: they return `Observation` objects and only `graph/builder.py`
 merges them. Every entry point goes through the scope guard first, and everything a plugin emits
 passes through `privacy.py` before entering the graph. Details: [docs/architecture.md](docs/architecture.md).
+
+## Sources and their limits
+
+Passive means third-party public data only; nothing is ever sent to the target.
+
+| Source | Gives | Main limit |
+|---|---|---|
+| crt.sh (Certificate Transparency) | subdomains, certificates | only names with a logged certificate; wildcards hide hosts; frequent 5xx |
+| DNS (system resolver) | A/AAAA, CNAME, MX, NS, TXT, DMARC | resolves known names, does not discover |
+| RDAP / WHOIS fallback | registered name servers | contacts discarded; WHOIS only when the TLD has no RDAP |
+| Team Cymru, iptoasn (local) | ASN, holder, country | country level; a CDN IP says nothing about the origin |
+| Wayback CDX | archived paths | only what the Archive crawled; query strings stripped |
+| Shodan (optional, key) | ports/banners already scanned | off without a key; data stays Shodan's |
+| Google dorks | links to open by hand | never run automatically |
+
+Coverage is a lower bound: hosts with no certificate, archive entry or reachable DNS name are
+invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sources.md).
