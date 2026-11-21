@@ -7,13 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
+from risk_helpers import graph_of
+from surfacemap.graph.builder import SurfaceGraph
 from surfacemap.models import (
     DnsRecord,
     Domain,
-    Entity,
-    Observation,
-    Provenance,
     Relation,
     RelationType,
     Severity,
@@ -23,18 +21,6 @@ from surfacemap.risk.takeover import Provider, TakeoverRule, load_providers
 
 NXDOMAIN = DnsRecord(type="RCODE", value="NXDOMAIN")
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
-
-
-def graph_of(*items: Entity | Relation) -> SurfaceGraph:
-    return build_graph(
-        [
-            Observation(
-                provenance=Provenance(source="dns_records", retrieved_at=T0, query="example.com"),
-                entities=[i for i in items if not isinstance(i, Relation)],
-                relations=[i for i in items if isinstance(i, Relation)],
-            )
-        ]
-    )
 
 
 def cname(source: Domain, target: Domain) -> Relation:
@@ -103,3 +89,15 @@ def test_load_providers_rejects_malformed_file(tmp_path: Path) -> None:
     bad.write_text("providers:\n  - name: X\n", encoding="utf-8")
     with pytest.raises(ValueError, match="suffixes"):
         load_providers(bad)
+
+
+def test_takeover_behind_an_out_of_scope_intermediate_hop_is_attributed_to_in_scope_name() -> None:
+    partner = Domain(fqdn="cdn.partner.net", in_scope=False)
+    findings = evaluate(graph_of(BLOG, partner, DEAD, cname(BLOG, partner), cname(partner, DEAD)))
+    assert [f.evidence for f in findings] == [(BLOG.id, DEAD.id)]
+
+
+def test_cname_loop_terminates() -> None:
+    a = Domain(fqdn="a.example.com", in_scope=True)
+    b = Domain(fqdn="b.example.com", in_scope=True)
+    assert evaluate(graph_of(a, b, cname(a, b), cname(b, a))) == ()

@@ -2,37 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
+from risk_helpers import graph_of
 from surfacemap.models import (
     ASN,
     Domain,
     Entity,
     Finding,
     IPAddress,
-    Observation,
-    Provenance,
     Relation,
     RelationType,
     Severity,
 )
 from surfacemap.risk import RuleContext
 from surfacemap.risk.hosting import MIN_PROVIDERS, HostingSprawlRule, provider_key
-
-
-def graph_of(*items: Entity | Relation) -> SurfaceGraph:
-    return build_graph(
-        [
-            Observation(
-                provenance=Provenance(
-                    source="asn", retrieved_at=datetime(2026, 1, 1, tzinfo=UTC), query="q"
-                ),
-                entities=tuple(i for i in items if not isinstance(i, Relation)),
-                relations=tuple(i for i in items if isinstance(i, Relation)),
-            )
-        ]
-    )
 
 
 def check(*items: Entity | Relation) -> tuple[Finding, ...]:
@@ -63,8 +47,8 @@ def sprawl(n: int) -> list[Entity | Relation]:
 
 
 def test_provider_key_groups_same_operator() -> None:
-    assert provider_key("AMAZON-02, US") == provider_key("AMAZON-AES, US") == "amazon"
-    assert provider_key("OVH SAS, FR") == "ovh"
+    assert provider_key("AMAZON-02, US", 1) == provider_key("AMAZON-AES, US", 2) == "amazon"
+    assert provider_key("OVH SAS, FR", 3) == "ovh"
     assert provider_key(None, 64500) == "as64500"
 
 

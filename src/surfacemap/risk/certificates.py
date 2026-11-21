@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from surfacemap.models import Certificate, Domain, Finding, RelationType, Severity
+from surfacemap.models import Certificate, Finding, RelationType, Severity
+from surfacemap.risk._graph import in_scope_domains, targets_by_type
 from surfacemap.risk.engine import RuleContext
 
 SOON_DAYS = 30
@@ -26,25 +27,20 @@ class CertificateRule:
     id = "certificates"
 
     def evaluate(self, ctx: RuleContext) -> Iterable[Finding]:
-        latest: dict[str, Certificate] = {}
-        for source, rel_type, target in ctx.graph.edges:
-            if rel_type is not RelationType.SECURED_BY:
+        index = targets_by_type(ctx.graph)
+        for domain in in_scope_domains(ctx.graph):
+            certs = [
+                node.entity
+                for target in index.get((domain.id, RelationType.SECURED_BY), ())
+                if (node := ctx.graph.nodes.get(target)) is not None
+                and isinstance(node.entity, Certificate)
+            ]
+            if not certs:
                 continue
-            host, cert_node = ctx.graph.nodes.get(source), ctx.graph.nodes.get(target)
-            if host is None or cert_node is None:
-                continue
-            domain, cert = host.entity, cert_node.entity
-            if not (isinstance(domain, Domain) and isinstance(cert, Certificate)):
-                continue
-            if not domain.in_scope:
-                continue
-            best = latest.get(domain.id)
-            if best is None or cert.not_after > best.not_after:
-                latest[domain.id] = cert
-
-        for domain_id in sorted(latest):
-            cert = latest[domain_id]
-            fqdn = domain_id.removeprefix("domain:")
+            # Tie on not_after (re-issue): break by id so the evidence is order-independent.
+            cert = max(certs, key=lambda c: (c.not_after, c.id))
+            fqdn = domain.fqdn
+            domain_id = domain.id
             days_left = (cert.not_after.date() - ctx.today).days
             evidence = (domain_id, cert.id)
             if days_left < 0:
@@ -65,7 +61,11 @@ class CertificateRule:
                 yield Finding(
                     rule_id=self.id,
                     severity=Severity.HIGH if days_left <= URGENT_DAYS else Severity.MEDIUM,
-                    title=f"Certificate on {fqdn} expires in {days_left} day(s)",
+                    title=(
+                        f"Certificate on {fqdn} expires today"
+                        if days_left == 0
+                        else f"Certificate on {fqdn} expires in {days_left} day(s)"
+                    ),
                     rationale=(
                         f"The newest certificate seen for {fqdn} ends on "
                         f"{cert.not_after:%Y-%m-%d} and no renewal has been logged yet."

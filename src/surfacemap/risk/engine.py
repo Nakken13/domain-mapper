@@ -20,7 +20,7 @@ from datetime import date
 from typing import Protocol, runtime_checkable
 
 from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models import Finding
+from surfacemap.models import Finding, Severity
 
 
 class RuleError(RuntimeError):
@@ -42,10 +42,13 @@ class Rule(Protocol):
     def evaluate(self, ctx: RuleContext) -> Iterable[Finding]: ...
 
 
+_SEVERITY_RANK = {severity: rank for rank, severity in enumerate(Severity)}
+
+
 def _sort_key(finding: Finding) -> tuple[int, str, tuple[str, ...], str]:
     # Severity is compared by rank (highest first); the title makes the order total.
     return (
-        -list(type(finding.severity)).index(finding.severity),
+        -_SEVERITY_RANK[finding.severity],
         finding.rule_id,
         finding.evidence,
         finding.title,

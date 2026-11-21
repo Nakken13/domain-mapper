@@ -7,9 +7,10 @@ Two conservative choices, both to avoid reporting a risk that is only a failed l
 
 * DMARC is judged only when the plugin recorded a state for the name (`dmarc_of` returns
   None for "unknown", which stays silent);
-* a missing SPF is reported only for a name with an MX edge, i.e. one that really handles
-  mail: an absent TXT set cannot be told apart from a failed lookup, and a name that sends
-  no mail does not need SPF.
+* a missing SPF is reported only for a name that has an MX edge (it handles mail) *and* a
+  recorded DMARC state (the DNS plugin's mail-related enrichment ran for it). An empty TXT
+  set still cannot be told apart from a failed TXT query, so this is a best effort and the
+  rationale says so; a name that sends no mail does not need SPF.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from collections.abc import Iterable, Iterator
 
 from surfacemap.models import Domain, Finding, RelationType, Severity
 from surfacemap.plugins.mailauth import SPF_LOOKUP_LIMIT, DmarcPolicy, SpfPolicy, dmarc_of, spf_of
+from surfacemap.risk._graph import in_scope_domains, targets_by_type
 from surfacemap.risk.engine import RuleContext
 
 
@@ -25,17 +27,14 @@ class EmailAuthRule:
     id = "email-auth"
 
     def evaluate(self, ctx: RuleContext) -> Iterable[Finding]:
-        mail_domains = {key[0] for key in ctx.graph.edges if key[1] is RelationType.MX}
-        for node_id in sorted(ctx.graph.nodes):
-            domain = ctx.graph.nodes[node_id].entity
-            if not isinstance(domain, Domain) or not domain.in_scope:
-                continue
+        index = targets_by_type(ctx.graph)
+        for domain in in_scope_domains(ctx.graph):
             dmarc = dmarc_of(domain)
             yield from self._dmarc(domain, dmarc)
             yield from self._spf(
                 domain,
                 spf_of(domain),
-                handles_mail=domain.id in mail_domains,
+                handles_mail=(domain.id, RelationType.MX) in index and dmarc is not None,
                 dmarc_enforced=isinstance(dmarc, DmarcPolicy) and dmarc.is_enforced,
             )
 
@@ -114,8 +113,9 @@ class EmailAuthRule:
                     domain,
                     Severity.MEDIUM,
                     "No SPF record",
-                    "The domain has a mail server but publishes no SPF record, so receivers "
-                    "cannot check which hosts may send for it.",
+                    "The domain has a mail server and no SPF record was found in DNS, so receivers "
+                    "cannot check which hosts may send for it. (A failed TXT lookup would look "
+                    "the same: re-run before acting.)",
                     "Publish a v=spf1 TXT record listing the legitimate senders, ending in -all.",
                 )
             return

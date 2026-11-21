@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
+from risk_helpers import graph_of
 from surfacemap.models import (
     Certificate,
     Domain,
     Entity,
     Finding,
-    Observation,
-    Provenance,
     Relation,
     RelationType,
     Severity,
@@ -32,18 +30,6 @@ def cert(n: int, *, ends_in_days: int, host: Domain = WWW) -> tuple[Certificate,
         not_after=NOW + timedelta(days=ends_in_days),
     )
     return c, Relation.between(host, RelationType.SECURED_BY, c)
-
-
-def graph_of(*items: Entity | Relation) -> SurfaceGraph:
-    return build_graph(
-        [
-            Observation(
-                provenance=Provenance(source="crtsh", retrieved_at=NOW, query="example.com"),
-                entities=[i for i in items if not isinstance(i, Relation)],
-                relations=[i for i in items if isinstance(i, Relation)],
-            )
-        ]
-    )
 
 
 def check(*items: Entity | Relation) -> tuple[Finding, ...]:
@@ -93,3 +79,16 @@ def test_out_of_scope_domain_ignored() -> None:
 def test_expiry_day_itself_counts_as_expiring_not_expired() -> None:
     (finding,) = check(WWW, *cert(1, ends_in_days=0))
     assert finding.severity is Severity.HIGH
+
+
+def test_expiring_today_is_worded_today() -> None:
+    (finding,) = check(WWW, *cert(1, ends_in_days=0))
+    assert "today" in finding.title
+
+
+def test_tie_on_not_after_picks_the_same_cert_whatever_the_order() -> None:
+    first, first_rel = cert(1, ends_in_days=3)
+    second, second_rel = cert(2, ends_in_days=3)
+    a = check(WWW, first, first_rel, second, second_rel)
+    b = check(WWW, second, second_rel, first, first_rel)
+    assert a == b

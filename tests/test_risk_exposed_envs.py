@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
 
 import pytest
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
+from risk_helpers import graph_of
 from surfacemap.models import (
     Domain,
     Entity,
     Finding,
     IPAddress,
-    Observation,
-    Provenance,
     Relation,
     RelationType,
     Severity,
@@ -22,20 +20,6 @@ from surfacemap.risk import RuleContext
 from surfacemap.risk.exposed_envs import ExposedEnvironmentRule
 
 IP = IPAddress(address="192.0.2.1")
-
-
-def graph_of(*items: Entity | Relation) -> SurfaceGraph:
-    return build_graph(
-        [
-            Observation(
-                provenance=Provenance(
-                    source="dns_records", retrieved_at=datetime(2026, 1, 1, tzinfo=UTC), query="q"
-                ),
-                entities=[i for i in items if not isinstance(i, Relation)],
-                relations=[i for i in items if isinstance(i, Relation)],
-            )
-        ]
-    )
 
 
 def check(*items: Entity | Relation) -> tuple[Finding, ...]:
@@ -78,12 +62,6 @@ def test_name_that_does_not_resolve_is_not_exposed() -> None:
     assert check(Domain(fqdn="dev.example.com", in_scope=True)) == ()
 
 
-def test_cname_counts_as_exposed() -> None:
-    dev = Domain(fqdn="dev.example.com", in_scope=True)
-    target = Domain(fqdn="x.cdn.example.net", in_scope=False)
-    assert len(check(dev, target, Relation.between(dev, RelationType.CNAME_TO, target))) == 1
-
-
 def test_out_of_scope_name_is_ignored() -> None:
     assert check(*resolving("dev.other.org", in_scope=False)) == ()
 
@@ -91,3 +69,22 @@ def test_out_of_scope_name_is_ignored() -> None:
 def test_registrable_part_is_not_inspected() -> None:
     # A scope root called test.com is not a "test environment".
     assert check(*resolving("test.com")) == ()
+
+
+def test_dangling_cname_is_not_reported_as_resolving() -> None:
+    dev = Domain(fqdn="dev.example.com", in_scope=True)
+    target = Domain(fqdn="old.herokuapp.com", in_scope=False)
+    assert check(dev, target, Relation.between(dev, RelationType.CNAME_TO, target)) == ()
+
+
+def test_cname_chain_ending_in_an_address_is_exposed() -> None:
+    dev = Domain(fqdn="dev.example.com", in_scope=True)
+    cdn = Domain(fqdn="x.cdn.example.net", in_scope=False)
+    items = [
+        dev,
+        cdn,
+        IP,
+        Relation.between(dev, RelationType.CNAME_TO, cdn),
+        Relation.between(cdn, RelationType.RESOLVES_TO, IP),
+    ]
+    assert len(check(*items)) == 1

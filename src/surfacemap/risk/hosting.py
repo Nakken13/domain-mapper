@@ -19,7 +19,8 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable
 
-from surfacemap.models import ASN, Domain, Finding, RelationType, Severity
+from surfacemap.models import ASN, Finding, RelationType, Severity
+from surfacemap.risk._graph import cname_chain, in_scope_domains, targets_by_type
 from surfacemap.risk.engine import RuleContext
 
 MIN_PROVIDERS = 3
@@ -27,7 +28,7 @@ MIN_PROVIDERS = 3
 _TOKEN = re.compile(r"[a-z0-9]+")
 
 
-def provider_key(holder: str | None, number: int | None = None) -> str:
+def provider_key(holder: str | None, number: int) -> str:
     """Grouping key of an ASN holder; falls back to the AS number when unnamed."""
     if holder:
         match = _TOKEN.search(holder.lower())
@@ -41,31 +42,20 @@ class HostingSprawlRule:
 
     def evaluate(self, ctx: RuleContext) -> Iterable[Finding]:
         graph = ctx.graph
-        targets: dict[tuple[str, RelationType], set[str]] = defaultdict(set)
-        for source, rel_type, target in graph.edges:
-            targets[(source, rel_type)].add(target)
+        targets = targets_by_type(graph)
 
         asns: dict[str, set[str]] = defaultdict(set)  # provider key -> ASN ids
         names: dict[str, set[str]] = defaultdict(set)  # provider key -> in-scope names
-        for node_id, node in graph.nodes.items():
-            if not (isinstance(node.entity, Domain) and node.entity.in_scope):
-                continue
-            seen: set[str] = set()
-            stack = [node_id]
-            while stack:  # follow the CNAME chain; `seen` also stops a CNAME loop
-                current = stack.pop()
-                if current in seen:
-                    continue
-                seen.add(current)
-                stack.extend(targets.get((current, RelationType.CNAME_TO), ()))
-                for ip_id in targets.get((current, RelationType.RESOLVES_TO), ()):
+        for domain in in_scope_domains(graph):
+            for name in (domain.id, *cname_chain(targets, domain.id)):
+                for ip_id in targets.get((name, RelationType.RESOLVES_TO), ()):
                     for asn_id in targets.get((ip_id, RelationType.ANNOUNCED_BY), ()):
                         asn_node = graph.nodes.get(asn_id)
                         if asn_node is None or not isinstance(asn_node.entity, ASN):
                             continue
                         key = provider_key(asn_node.entity.holder, asn_node.entity.number)
                         asns[key].add(asn_id)
-                        names[key].add(node_id)
+                        names[key].add(domain.id)
 
         if len(asns) < MIN_PROVIDERS:
             return

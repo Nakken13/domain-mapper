@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
+from risk_helpers import graph_of
 from surfacemap.models import (
     DnsRecord,
     Domain,
     Entity,
     Finding,
-    Observation,
-    Provenance,
     Relation,
     RelationType,
     Severity,
@@ -23,18 +21,6 @@ T0 = datetime(2026, 1, 1, tzinfo=UTC)
 MAIL = Domain(fqdn="mail.example.net", in_scope=False)
 GOOD_DMARC = "v=DMARC1; p=reject; rua=mailto:r@example.com"
 GOOD_SPF = "v=spf1 include:_spf.example.net -all"
-
-
-def graph_of(*items: Entity | Relation) -> SurfaceGraph:
-    return build_graph(
-        [
-            Observation(
-                provenance=Provenance(source="dns_records", retrieved_at=T0, query="example.com"),
-                entities=[i for i in items if not isinstance(i, Relation)],
-                relations=[i for i in items if isinstance(i, Relation)],
-            )
-        ]
-    )
 
 
 def root(
@@ -153,3 +139,8 @@ def test_ptr_mechanism_is_low() -> None:
 
 def test_out_of_scope_domain_is_ignored() -> None:
     assert check(*root(("DMARC", ""), in_scope=False)) == ()
+
+
+def test_missing_spf_stays_silent_without_a_recorded_dmarc_state() -> None:
+    # No DMARC record at all: the mail enrichment may not have run, so do not guess.
+    assert check(*root(("TXT", "google-site-verification=abc"))) == ()

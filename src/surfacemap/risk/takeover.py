@@ -1,6 +1,6 @@
 """Subdomain-takeover rule: a CNAME that points to a claimable provider and no longer resolves.
 
-Traffic: none. The evidence is already in the graph: a `CNAME_TO` edge, and the
+Traffic: none. The evidence is already in the graph: a `CNAME_TO` chain, and the
 `RCODE=NXDOMAIN` record the DNS plugin put on the last name of the chain. We deliberately do
 not fetch the page to look for a provider error banner: that would be an HTTP request to the
 target, and "possible takeover" is a *lead* to verify by the owner, not a proof.
@@ -17,11 +17,12 @@ from pathlib import Path
 
 import yaml
 
-from surfacemap.models import Domain, Finding, RelationType, Severity
+from surfacemap.models import Domain, Finding, Severity
+from surfacemap.plugins.dns_records import NXDOMAIN
+from surfacemap.risk._graph import cname_chain, in_scope_domains, targets_by_type
 from surfacemap.risk.engine import RuleContext
 
 DATA_FILE = Path(__file__).parent / "data" / "takeover_providers.yaml"
-_NXDOMAIN = ("RCODE", "NXDOMAIN")
 
 
 @dataclass(frozen=True)
@@ -60,33 +61,33 @@ class TakeoverRule:
 
     def evaluate(self, ctx: RuleContext) -> Iterable[Finding]:
         nodes = ctx.graph.nodes
-        for source_id, rel_type, target_id in ctx.graph.edges:
-            if rel_type is not RelationType.CNAME_TO:
-                continue
-            source, target = nodes.get(source_id), nodes.get(target_id)
-            if source is None or target is None:
-                continue
-            src, dst = source.entity, target.entity
-            if not (isinstance(src, Domain) and isinstance(dst, Domain)) or not src.in_scope:
-                continue
-            if not any((r.type, r.value) == _NXDOMAIN for r in dst.records):
-                continue
-            provider = next((p for p in self._providers if p.matches(dst.fqdn)), None)
-            if provider is None:
-                continue
-            yield Finding(
-                rule_id=self.id,
-                severity=Severity.HIGH,
-                title=f"Possible subdomain takeover: {src.fqdn} -> {dst.fqdn}",
-                rationale=(
-                    f"{src.fqdn} is a CNAME to {dst.fqdn} ({provider.name}), which answers "
-                    "NXDOMAIN. Anyone who registers that name at the provider could serve "
-                    "content on your subdomain. Detected from DNS only, no HTTP request was "
-                    "sent to the target: confirm before acting."
-                ),
-                evidence=(src.id, dst.id),
-                remediation=(
-                    f"Delete the CNAME for {src.fqdn}, or re-create the resource at "
-                    f"{provider.name} under your account."
-                ),
-            )
+        index = targets_by_type(ctx.graph)
+        for src in in_scope_domains(ctx.graph):
+            # Every hop, not only the first: www -> partner CDN (out of scope) -> x.github.io
+            # is still www's takeover risk.
+            for target_id in cname_chain(index, src.id):
+                target = nodes.get(target_id)
+                dst = target.entity if target is not None else None
+                if not isinstance(dst, Domain):
+                    continue
+                if NXDOMAIN not in dst.records:
+                    continue
+                provider = next((p for p in self._providers if p.matches(dst.fqdn)), None)
+                if provider is None:
+                    continue
+                yield Finding(
+                    rule_id=self.id,
+                    severity=Severity.HIGH,
+                    title=f"Possible subdomain takeover: {src.fqdn} -> {dst.fqdn}",
+                    rationale=(
+                        f"{src.fqdn} is a CNAME to {dst.fqdn} ({provider.name}), which answers "
+                        "NXDOMAIN. Anyone who registers that name at the provider could serve "
+                        "content on your subdomain. Detected from DNS only, no HTTP request was "
+                        "sent to the target: confirm before acting."
+                    ),
+                    evidence=(src.id, dst.id),
+                    remediation=(
+                        f"Delete the CNAME for {src.fqdn}, or re-create the resource at "
+                        f"{provider.name} under your account."
+                    ),
+                )
