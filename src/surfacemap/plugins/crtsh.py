@@ -40,6 +40,7 @@ from surfacemap.models import (
     RelationType,
 )
 from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
+from surfacemap.privacy import scrub_emails
 from surfacemap.scope import InvalidDomainError, normalize_domain
 
 CRTSH_URL = "https://crt.sh/"
@@ -158,11 +159,12 @@ def _rows(body: str) -> list[Any]:
 
 
 def _minimize(body: str) -> str:
-    """The crt.sh payload reduced to the fields used here, email identities removed.
+    """The crt.sh payload reduced to the fields used here, personal data removed.
 
-    Runs before the response cache: S/MIME certificates list personal emails, and the raw
-    body must never reach disk. Structural, not a regex over the JSON text, so the name
-    following an email in a multi-line `name_value` survives.
+    Runs before the response cache: S/MIME certificates list personal emails and person
+    names (as CN), and the raw body must never reach disk. Only identity lines that are
+    hostnames are kept (structural, not a regex over the JSON text, so the name following
+    a dropped line in a multi-line `name_value` survives); the issuer DN is email-scrubbed.
     """
     kept: list[dict[str, Any]] = []
     for row in _rows(body):
@@ -172,7 +174,10 @@ def _minimize(body: str) -> str:
         for key in _IDENTITY_FIELDS:
             value = fields.get(key)
             if isinstance(value, str):
-                fields[key] = "\n".join(x for x in value.splitlines() if "@" not in x)
+                fields[key] = "\n".join(x for x in value.splitlines() if _hostname(x))
+        issuer = fields.get("issuer_name")
+        if isinstance(issuer, str):
+            fields["issuer_name"] = scrub_emails(issuer)
         kept.append(fields)
     return json.dumps(kept)
 
@@ -192,6 +197,14 @@ def _fingerprint(pem: str) -> str:
     return hashlib.sha256(der).hexdigest()
 
 
+def _hostname(identity: str) -> str | None:
+    """The normalized hostname an identity line names (`*.` stripped), None if it is not one."""
+    try:
+        return normalize_domain(identity.strip().lower().removeprefix("*."))
+    except InvalidDomainError:
+        return None
+
+
 def _sans(root: str, row: dict[str, Any]) -> tuple[str, ...]:
     """Names of a minimized row under `root`, normalized, `*.` wildcards kept."""
     sans: set[str] = set()
@@ -200,13 +213,11 @@ def _sans(root: str, row: dict[str, Any]) -> tuple[str, ...]:
         if not isinstance(value, str):
             continue
         for identity in value.splitlines():
-            raw = identity.strip().lower()
-            wildcard = raw.startswith("*.")
-            try:
-                name = normalize_domain(raw.removeprefix("*."))
-            except InvalidDomainError:
+            name = _hostname(identity)
+            if name is None:
                 logger.debug("crtsh: skipped an identity that is not a hostname")
                 continue
+            wildcard = identity.strip().startswith("*.")
             if name == root or name.endswith("." + root):
                 sans.add(f"*.{name}" if wildcard else name)
     return tuple(sorted(sans))

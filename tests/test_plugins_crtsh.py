@@ -108,6 +108,29 @@ async def test_cached_body_holds_no_email_and_only_needed_fields(
         assert "www.example.com" in body  # the name after the dropped email survives
 
 
+@respx.mock
+async def test_cached_body_keeps_only_hostname_identities_and_no_issuer_email(
+    plugin_ctx: PluginContext,
+) -> None:
+    # S/MIME certificates carry a person's name as CN; the issuer DN may carry an email.
+    mock_crtsh(
+        [
+            {
+                "common_name": "Jane Doe",
+                "name_value": "Jane Doe\nwww.example.com",
+                "issuer_name": "C=US, O=Acme, emailAddress=pki@acme.test",
+            }
+        ]
+    )
+    respx.get(CRTSH_URL).respond(404)
+    await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    [(body,)] = plugin_ctx.cache._db.execute("SELECT body FROM responses").fetchall()
+    assert "Jane" not in body
+    assert "pki@acme.test" not in body
+    assert "www.example.com" in body
+
+
 def mock_pem(cert_id: int, body: str, status: int = 200) -> respx.Route:
     return respx.get(CRTSH_URL, params={"d": str(cert_id)}).respond(status, text=body)
 
