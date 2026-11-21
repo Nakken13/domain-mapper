@@ -17,7 +17,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] docs(readme): sources and their limits
 - [x] docs(readme): methodology
 - [x] docs(readme): ethics & legal section citing French Penal Code art. 323-1
-- [ ] docs(media): demo GIF of the report
+- [x] docs(media): demo GIF of the report
 - [ ] docs(readme): badges (CI, coverage, licence, python) - blocked until GitHub remote exists
 - [x] docs(readme): improvement ideas
 - [ ] Review + merge branch into main

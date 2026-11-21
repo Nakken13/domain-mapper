@@ -16,6 +16,14 @@ cp scope.example.yaml scope.yaml            # list the domains you are authorize
 
 The report is a single self-contained HTML file (Cytoscape.js inlined): open it offline.
 
+## Demo
+
+![Report demo: surface graph, then risk findings](media/surfacemap-demo.gif)
+
+*Illustrative only: a fictional `example.com` surface (documentation IP ranges), not a real scan,
+because the only authorized real target has a single host. Regenerate it with
+`python media/make_demo_report.py demo.html`.*
+
 ## Architecture
 
 ```mermaid
