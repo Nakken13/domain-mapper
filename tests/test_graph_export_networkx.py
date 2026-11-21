@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 
 import networkx as nx
 
-from surfacemap.graph.builder import build_graph
-from surfacemap.graph.export import to_networkx, write_graphml, write_json
-from surfacemap.models import (
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.graph.export import to_networkx, write_graphml, write_json
+from domain_mapper.models import (
     Certificate,
     Domain,
     Entity,

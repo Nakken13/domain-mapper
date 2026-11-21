@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.tui import flow
+from domain_mapper.tui import flow
 
 SCOPE = Path("scope.yaml")
 
@@ -133,7 +133,7 @@ def test_default_scan_refuses_out_of_scope_before_any_collection(
     def boom(*_args, **_kwargs):
         raise AssertionError("collection must not start for an out-of-scope domain")
 
-    monkeypatch.setattr("surfacemap.cli._collect", boom)
+    monkeypatch.setattr("domain_mapper.cli._collect", boom)
     code = flow.default_scan("other.test", scope_file, tmp_path / "r.html")
     assert code == 1
     assert not (tmp_path / "r.html").exists()
@@ -147,7 +147,7 @@ def test_default_scan_survives_an_unexpected_error(scope_file: Path, monkeypatch
     def explode(*_args, **_kwargs):
         raise OSError("disk full")
 
-    monkeypatch.setattr("surfacemap.cli.scan", explode)
+    monkeypatch.setattr("domain_mapper.cli.scan", explode)
     assert flow.default_scan("example.com", scope_file, None) == 2
     assert "disk full" in capsys.readouterr().err
 

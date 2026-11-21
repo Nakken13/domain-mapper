@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from surfacemap.graph.builder import build_graph
-from surfacemap.graph.metrics import compute_metrics, critical_nodes
-from surfacemap.models import Domain, IPAddress, Observation, Provenance, Relation
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.graph.metrics import compute_metrics, critical_nodes
+from domain_mapper.models import Domain, IPAddress, Observation, Provenance, Relation
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 A = Domain(fqdn="a.example.com", in_scope=True)

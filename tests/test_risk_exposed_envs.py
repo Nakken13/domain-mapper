@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from risk_helpers import graph_of
-from surfacemap.models import (
+from domain_mapper.models import (
     Domain,
     Entity,
     Finding,
@@ -16,8 +16,8 @@ from surfacemap.models import (
     RelationType,
     Severity,
 )
-from surfacemap.risk import RuleContext
-from surfacemap.risk.exposed_envs import ExposedEnvironmentRule
+from domain_mapper.risk import RuleContext
+from domain_mapper.risk.exposed_envs import ExposedEnvironmentRule
 
 IP = IPAddress(address="192.0.2.1")
 

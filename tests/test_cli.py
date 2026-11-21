@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from surfacemap import __version__
-from surfacemap.cli import app
+from domain_mapper import __version__
+from domain_mapper.cli import app
 
 runner = CliRunner()
 
@@ -58,6 +58,6 @@ def test_scope_file_defaults_to_cwd(scope_file: Path, monkeypatch: pytest.Monkey
 
 
 def test_module_entry_point_exposes_app() -> None:
-    import surfacemap.__main__ as main_module
+    import domain_mapper.__main__ as main_module
 
     assert main_module.app is app

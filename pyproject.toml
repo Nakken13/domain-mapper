@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "surfacemap"
+name = "domain-mapper"
 version = "0.1.0.dev0"
 description = "Passive attack-surface mapping of a domain you are authorized to assess, rendered as a graph."
 readme = "README.md"
@@ -33,8 +33,8 @@ dependencies = [
 ]
 
 [project.scripts]
-surfacemap = "surfacemap.cli:app"
-surfacemap-tool = "surfacemap.tui:main"
+domain-mapper = "domain_mapper.cli:app"
+domain-mapper-tool = "domain_mapper.tui:main"
 
 [project.optional-dependencies]
 neo4j = ["neo4j>=5.20"]
@@ -47,17 +47,17 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/surfacemap"]
+packages = ["src/domain_mapper"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-ra --strict-markers --cov=surfacemap --cov-report=term-missing --cov-fail-under=80"
+addopts = "-ra --strict-markers --cov=domain_mapper --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
 branch = true
-source = ["surfacemap"]
+source = ["domain_mapper"]
 
 [tool.ruff]
 line-length = 100

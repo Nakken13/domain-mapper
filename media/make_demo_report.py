@@ -16,9 +16,9 @@ from datetime import UTC, date, datetime
 from hashlib import sha256
 from pathlib import Path
 
-from surfacemap.cli import _default_rules
-from surfacemap.graph.builder import build_graph
-from surfacemap.models import (
+from domain_mapper.cli import _default_rules
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.models import (
     ASN,
     Certificate,
     Domain,
@@ -28,8 +28,8 @@ from surfacemap.models import (
     Relation,
     RelationType,
 )
-from surfacemap.report import render_report
-from surfacemap.risk.engine import RuleContext, run_rules
+from domain_mapper.report import render_report
+from domain_mapper.risk.engine import RuleContext, run_rules
 
 ROOT = "example.com"
 TODAY = date(2026, 11, 21)
@@ -57,7 +57,7 @@ def build_demo() -> list[Observation]:
     mail = IPAddress(address="198.51.100.25")
     asn = ASN(number=64500, holder="Example Hosting", country="FR")
     cert = Certificate(
-        sha256=sha256(b"surfacemap-demo").hexdigest(),
+        sha256=sha256(b"domain-mapper-demo").hexdigest(),
         issuer="Example CA",
         not_before=datetime(2026, 1, 1, tzinfo=UTC),
         not_after=datetime(2026, 12, 1, tzinfo=UTC),

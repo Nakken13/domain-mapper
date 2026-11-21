@@ -8,16 +8,16 @@ from pathlib import Path
 import pytest
 
 from risk_helpers import graph_of
-from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models import (
+from domain_mapper.graph.builder import SurfaceGraph
+from domain_mapper.models import (
     DnsRecord,
     Domain,
     Relation,
     RelationType,
     Severity,
 )
-from surfacemap.risk import RuleContext, run_rules
-from surfacemap.risk.takeover import Provider, TakeoverRule, load_providers
+from domain_mapper.risk import RuleContext, run_rules
+from domain_mapper.risk.takeover import Provider, TakeoverRule, load_providers
 
 NXDOMAIN = DnsRecord(type="RCODE", value="NXDOMAIN")
 T0 = datetime(2026, 1, 1, tzinfo=UTC)

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import respx
 
-from surfacemap.collect.engine import Engine
-from surfacemap.models import RelationType
-from surfacemap.plugins._resolver import DnsAnswer, ResourceRecord
-from surfacemap.plugins.asn import AsnPlugin
-from surfacemap.plugins.base import PluginContext
-from surfacemap.plugins.crtsh import CRTSH_URL, CrtshPlugin
-from surfacemap.plugins.dns_records import DnsPlugin
+from domain_mapper.collect.engine import Engine
+from domain_mapper.models import RelationType
+from domain_mapper.plugins._resolver import DnsAnswer, ResourceRecord
+from domain_mapper.plugins.asn import AsnPlugin
+from domain_mapper.plugins.base import PluginContext
+from domain_mapper.plugins.crtsh import CRTSH_URL, CrtshPlugin
+from domain_mapper.plugins.dns_records import DnsPlugin
 
 
 class TableResolver:

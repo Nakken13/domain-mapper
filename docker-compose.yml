@@ -1,4 +1,4 @@
-# Optional: local Neo4j to browse a SurfaceMap export (http://localhost:7474).
+# Optional: local Neo4j to browse a domain-mapper export (http://localhost:7474).
 # Not needed for the HTML report. Set NEO4J_PASSWORD before `docker compose up`.
 services:
   neo4j:

@@ -11,12 +11,12 @@ import httpx
 import pytest
 import respx
 
-from surfacemap.collect.http import FetchError
-from surfacemap.models import Certificate, Domain, IPAddress, RelationType
-from surfacemap.plugins import crtsh
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.crtsh import CRTSH_URL, CrtshPlugin
-from surfacemap.scope import Scope, ScopeEntry
+from domain_mapper.collect.http import FetchError
+from domain_mapper.models import Certificate, Domain, IPAddress, RelationType
+from domain_mapper.plugins import crtsh
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.crtsh import CRTSH_URL, CrtshPlugin
+from domain_mapper.scope import Scope, ScopeEntry
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 

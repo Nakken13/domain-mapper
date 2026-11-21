@@ -1,6 +1,6 @@
 # Sources and their limits
 
-Every source is third-party and public. SurfaceMap never sends a request to the target or its
+Every source is third-party and public. domain-mapper never sends a request to the target or its
 subdomains; the only traffic it generates is listed below (each plugin states it in its module docstring).
 
 | Source | Plugin | Traffic | Yields | Key limits |

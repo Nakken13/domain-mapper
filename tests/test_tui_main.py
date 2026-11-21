@@ -1,9 +1,9 @@
-"""Entry point `surfacemap-tool`: needs a terminal, exits cleanly on Ctrl-C."""
+"""Entry point `domain-mapper-tool`: needs a terminal, exits cleanly on Ctrl-C."""
 
 import pytest
 
-from surfacemap import tui
-from surfacemap.tui import flow
+from domain_mapper import tui
+from domain_mapper.tui import flow
 
 
 class _Tty:

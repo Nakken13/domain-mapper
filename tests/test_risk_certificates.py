@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 from risk_helpers import graph_of
-from surfacemap.models import (
+from domain_mapper.models import (
     Certificate,
     Domain,
     Entity,
@@ -14,8 +14,8 @@ from surfacemap.models import (
     RelationType,
     Severity,
 )
-from surfacemap.risk import RuleContext
-from surfacemap.risk.certificates import SOON_DAYS, CertificateRule
+from domain_mapper.risk import RuleContext
+from domain_mapper.risk.certificates import SOON_DAYS, CertificateRule
 
 TODAY = date(2026, 11, 21)
 NOW = datetime(2026, 11, 21, 12, tzinfo=UTC)

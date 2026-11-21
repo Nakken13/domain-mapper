@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 
 from risk_helpers import graph_of
-from surfacemap.models import Domain, Finding, Severity
-from surfacemap.report import render_report
+from domain_mapper.models import Domain, Finding, Severity
+from domain_mapper.report import render_report
 
 
 def _finding(**overrides: object) -> Finding:

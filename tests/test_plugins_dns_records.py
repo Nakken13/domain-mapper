@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from surfacemap.models import DnsRecord, Domain, IPAddress, Observation, RelationType
-from surfacemap.plugins._resolver import DnsAnswer, DnsError, DnspythonResolver, ResourceRecord
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.dns_records import DnsPlugin
+from domain_mapper.models import DnsRecord, Domain, IPAddress, Observation, RelationType
+from domain_mapper.plugins._resolver import DnsAnswer, DnsError, DnspythonResolver, ResourceRecord
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.dns_records import DnsPlugin
 
 Answer = DnsAnswer | DnsError
 

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from surfacemap.models import Provenance, Relation, RelationType
+from domain_mapper.models import Provenance, Relation, RelationType
 
 NOW = datetime(2026, 11, 20, tzinfo=UTC)
 
@@ -114,7 +114,7 @@ def test_provenance_query_accepts_innocent_text(query: str) -> None:
 
 
 def test_relation_between_uses_canonical_entity_ids() -> None:
-    from surfacemap.models import Domain
+    from domain_mapper.models import Domain
 
     apex = Domain(fqdn="Example.com", in_scope=True)
     www = Domain(fqdn="WWW.example.com", in_scope=True)

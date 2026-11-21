@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from surfacemap.models import (
+from domain_mapper.models import (
     ASN,
     ArchivedURL,
     Certificate,

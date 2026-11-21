@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 
 from risk_helpers import graph_of
-from surfacemap.models import (
+from domain_mapper.models import (
     DnsRecord,
     Domain,
     Entity,
@@ -14,8 +14,8 @@ from surfacemap.models import (
     RelationType,
     Severity,
 )
-from surfacemap.risk import RuleContext
-from surfacemap.risk.email_auth import EmailAuthRule
+from domain_mapper.risk import RuleContext
+from domain_mapper.risk.email_auth import EmailAuthRule
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 MAIL = Domain(fqdn="mail.example.net", in_scope=False)

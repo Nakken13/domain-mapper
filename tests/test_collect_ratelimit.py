@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from surfacemap.collect.ratelimit import RateLimit, RateLimiter, TokenBucket
+from domain_mapper.collect.ratelimit import RateLimit, RateLimiter, TokenBucket
 
 
 class FakeTime:

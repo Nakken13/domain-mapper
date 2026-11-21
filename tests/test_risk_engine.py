@@ -7,9 +7,9 @@ from datetime import date
 
 import pytest
 
-from surfacemap.graph.builder import SurfaceGraph
-from surfacemap.models import Finding, Severity
-from surfacemap.risk import RuleContext, RuleError, run_rules
+from domain_mapper.graph.builder import SurfaceGraph
+from domain_mapper.models import Finding, Severity
+from domain_mapper.risk import RuleContext, RuleError, run_rules
 
 TODAY = date(2026, 11, 21)
 

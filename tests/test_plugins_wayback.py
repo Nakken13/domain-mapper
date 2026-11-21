@@ -9,14 +9,14 @@ import httpx
 import pytest
 import respx
 
-from surfacemap.collect.cache import ResponseCache
-from surfacemap.collect.http import FetchError, HttpClient
-from surfacemap.collect.ratelimit import RateLimiter
-from surfacemap.config import Settings
-from surfacemap.models import ArchivedURL, Domain, IPAddress, RelationType
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.wayback import CDX_URL, WaybackPlugin
-from surfacemap.scope import Scope, ScopeEntry
+from domain_mapper.collect.cache import ResponseCache
+from domain_mapper.collect.http import FetchError, HttpClient
+from domain_mapper.collect.ratelimit import RateLimiter
+from domain_mapper.config import Settings
+from domain_mapper.models import ArchivedURL, Domain, IPAddress, RelationType
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.wayback import CDX_URL, WaybackPlugin
+from domain_mapper.scope import Scope, ScopeEntry
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 
@@ -79,7 +79,7 @@ async def test_emits_archived_paths_without_query_strings(
 async def test_a_truncated_archive_is_logged(
     plugin_ctx: PluginContext, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setattr("surfacemap.plugins.wayback.CDX_LIMIT", 2)
+    monkeypatch.setattr("domain_mapper.plugins.wayback.CDX_LIMIT", 2)
     mock_cdx(
         [
             ["timestamp", "original"],

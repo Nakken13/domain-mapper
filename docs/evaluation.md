@@ -1,14 +1,14 @@
 # Evaluation
 
-Two questions: how much does each SurfaceMap source contribute, and how does a passive SurfaceMap
+Two questions: how much does each domain-mapper source contribute, and how does a passive domain-mapper
 scan compare with Amass and Subfinder in passive mode. Target: `logan-villard.fr` (owned by the
 author, authorized in `scope.yaml`).
 
 ## Method
 
-- **Per-source counts and Venn** (`surfacemap.evaluation.sources`): in-scope subdomains of the
+- **Per-source counts and Venn** (`domain_mapper.evaluation.sources`): in-scope subdomains of the
   apex seen by each plugin. The apex and look-alikes (`notexample.com`) are excluded.
-- **Benchmark** (`surfacemap.evaluation.benchmark`, driver `evaluation/run_benchmark.py`): each
+- **Benchmark** (`domain_mapper.evaluation.benchmark`, driver `evaluation/run_benchmark.py`): each
   tool is run once, timed, and its raw output saved untouched in `evaluation/results/`.
   Amass runs as `amass enum -passive -d <domain>`; Subfinder as `subfinder -d <domain> -silent`
   (passive-only by design). No brute force, no zone transfer.
@@ -24,7 +24,7 @@ Versions: Subfinder v2.17.0, Amass v5.1.3, no API keys configured for any tool.
 
 | tool | subdomains | only this tool | recall vs union | time (s) |
 |---|---|---|---|---|
-| surfacemap | 1 (`www`) | 1 | 100 % | 18.4 |
+| domain-mapper | 1 (`www`) | 1 | 100 % | 18.4 |
 | subfinder | 0 | 0 | 0 % | 25.9 |
 | amass | 0 | 0 | 0 % | 22.2 |
 
@@ -41,9 +41,9 @@ tool was missing its main source. It is not part of the results.
 
 - **This benchmark does not discriminate.** crt.sh holds no certificate for the domain and the
   other passive sources add almost nothing, so the whole surface is one host. "1 vs 0" is not
-  evidence that SurfaceMap has better coverage.
-- **Why SurfaceMap saw `www`.** Which plugin saw it was not recorded in this run (the driver now
-  saves `surfacemap-by-source.json` for future runs). A plausible cause is that SurfaceMap
+  evidence that domain-mapper has better coverage.
+- **Why domain-mapper saw `www`.** Which plugin saw it was not recorded in this run (the driver now
+  saves `domain-mapper-by-source.json` for future runs). A plausible cause is that domain-mapper
   resolves the domain's own records, which Subfinder and Amass in passive mode do not; that is
   a hypothesis, not a finding. If true, the difference is one of scope, not source quality.
 - **Run time is not comparable.** One run each, network-dependent, tools started cold. Treat
@@ -53,7 +53,7 @@ tool was missing its main source. It is not part of the results.
 
 ## Reading the graph metrics
 
-Implemented in `surfacemap.graph.metrics` (a library module: `surfacemap scan` does not show them in the
+Implemented in `domain_mapper.graph.metrics` (a library module: `domain-mapper scan` does not show them in the
 report yet), on the undirected view of the surface graph (direction of
 dependency is irrelevant to "what breaks if this goes away").
 

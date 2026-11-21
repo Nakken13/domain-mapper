@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from surfacemap.models import DnsRecord, Domain
-from surfacemap.plugins.mailauth import (
+from domain_mapper.models import DnsRecord, Domain
+from domain_mapper.plugins.mailauth import (
     DmarcPolicy,
     SpfPolicy,
     dmarc_of,

@@ -40,7 +40,7 @@ Thumbs.db
 # Venv du crew-dashboard (crew/dashboard.bat)
 .dashboard-venv/
 
-# SurfaceMap
+# domain-mapper
 scope.yaml
 .cache/
 out/

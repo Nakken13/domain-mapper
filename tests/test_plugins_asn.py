@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from surfacemap.models import ASN, Domain, IPAddress, RelationType
-from surfacemap.plugins._resolver import DnsAnswer, DnsError, DnspythonResolver, ResourceRecord
-from surfacemap.plugins.asn import AsnPlugin, origin_name
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.models import ASN, Domain, IPAddress, RelationType
+from domain_mapper.plugins._resolver import DnsAnswer, DnsError, DnspythonResolver, ResourceRecord
+from domain_mapper.plugins.asn import AsnPlugin, origin_name
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
 
 V4 = IPAddress(address="1.2.3.4")
 V6 = IPAddress(address="2606:4700::1111")

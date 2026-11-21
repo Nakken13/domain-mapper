@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>domain-mapper report - {{ domain }}</title>
+<style>
+:root { color-scheme: light dark; --fg: #1b1f24; --bg: #ffffff; --muted: #59636e; --line: #d0d7de; }
+@media (prefers-color-scheme: dark) { :root { --fg: #e6edf3; --bg: #0d1117; --muted: #9198a1; --line: #30363d; } }
+body { margin: 0; padding: 16px; font: 16px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+main { max-width: 72rem; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+.meta { color: var(--muted); margin: 0 0 1.5rem; }
+#cy { width: 100%; height: 60vh; min-height: 320px; border: 1px solid var(--line); border-radius: 6px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: .9375rem; }
+th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bottom: 1px solid var(--line); }
+.sev { display: inline-block; padding: 0 .5rem; border-radius: 999px; border: 1px solid currentColor; font-size: .8125rem; font-weight: 600; text-transform: lowercase; }
+.sev-critical { color: #cf222e; } .sev-high { color: #bc4c00; } .sev-medium { color: #9a6700; } .sev-low { color: #0969da; } .sev-info { color: var(--muted); }
+@media (prefers-color-scheme: dark) { .sev-critical { color: #ff7b72; } .sev-high { color: #ffa657; } .sev-medium { color: #e3b341; } .sev-low { color: #79c0ff; } }
+.evidence { font-family: ui-monospace, monospace; font-size: .8125rem; overflow-wrap: anywhere; }
+.legend { color: var(--muted); font-size: .875rem; margin: .5rem 0 1.5rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Attack surface of {{ domain }}</h1>
+<p class="meta">{{ node_count }} nodes, {{ edge_count }} relations, {{ findings|length }} findings. Passive sources only.</p>
+<div id="cy" role="img" aria-label="Graph of {{ node_count }} nodes and {{ edge_count }} relations for {{ domain }}"></div>
+<p class="legend">Solid outline: in scope, or not a domain (IPs and ASNs have no scope). Dashed red outline: a domain seen in passive data but outside the authorized scope.</p>
+<h2>Findings</h2>
+{% if findings %}
+<div class="table-wrap">
+<table>
+<thead><tr><th scope="col">Severity</th><th scope="col">Finding</th><th scope="col">Why it matters</th><th scope="col">Evidence</th><th scope="col">Fix</th></tr></thead>
+<tbody>
+{% for finding in findings %}
+<tr>
+<td><span class="sev sev-{{ finding.severity.value }}">{{ finding.severity.value }}</span></td>
+<td>{{ finding.title }}</td>
+<td>{{ finding.rationale }}</td>
+<td class="evidence">{% for e in finding.evidence %}{{ e }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+<td>{{ finding.remediation }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>No findings: no risk rule matched the passive data collected.</p>
+{% endif %}
+</main>
+<script type="application/json" id="graph-data">{{ graph_json|safe }}</script>
+<script>
+/* Cytoscape.js 3.33.1, inlined, no network access. Licence:
+
+{{ cytoscape_licence|safe }}
+*/
+{{ cytoscape_js|safe }}
+</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById("graph-data").textContent);
+  var elements = [];
+  data.nodes.forEach(function (n) { elements.push({ data: n }); });
+  data.edges.forEach(function (e, i) {
+    elements.push({ data: { id: "e" + i, source: e.source, target: e.target, type: e.type } });
+  });
+  cytoscape({
+    container: document.getElementById("cy"),
+    elements: elements,
+    layout: { name: "cose", animate: false },
+    style: [
+      { selector: "node", style: {
+        "label": "data(label)", "font-size": 10, "color": "#8b949e", "text-valign": "bottom", "text-margin-y": 4,
+        "background-color": "data(color)",
+        "border-width": 2, "border-color": "#0d1117" } },
+      { selector: "node[?out_of_scope]", style: { "border-style": "dashed", "border-color": "#f85149" } },
+      { selector: "edge", style: { "width": 1, "line-color": "#8b949e", "target-arrow-color": "#8b949e",
+        "target-arrow-shape": "triangle", "curve-style": "bezier" } }
+    ]
+  });
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 
-from surfacemap.tui import prompts
+from domain_mapper.tui import prompts
 
 
 def _inputs(*answers: str) -> prompts.InputFn:

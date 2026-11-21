@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from surfacemap.evaluation.benchmark import (
+from domain_mapper.evaluation.benchmark import (
     TOOL_COMMANDS,
     ToolFailedError,
     ToolNotInstalledError,
@@ -13,7 +13,7 @@ from surfacemap.evaluation.benchmark import (
     run_tool,
     subprocess_runner,
 )
-from surfacemap.evaluation.sources import is_subdomain
+from domain_mapper.evaluation.sources import is_subdomain
 
 APEX = "example.com"
 
@@ -91,7 +91,7 @@ def test_run_tool_rejects_an_unknown_tool() -> None:
 def test_compare_reports_coverage_unique_finds_and_recall() -> None:
     results = [
         ToolResult(
-            "surfacemap", frozenset({"a.example.com", "b.example.com", "c.example.com"}), 30.0, None
+            "domain-mapper", frozenset({"a.example.com", "b.example.com", "c.example.com"}), 30.0, None
         ),
         ToolResult("subfinder", frozenset({"b.example.com", "d.example.com"}), 8.0, None),
         ToolResult("amass", frozenset(), 0.0, "amass is not installed"),
@@ -100,9 +100,9 @@ def test_compare_reports_coverage_unique_finds_and_recall() -> None:
     rows = {row.name: row for row in compare(results)}
 
     # Union of everything any tool found: a, b, c, d.
-    assert rows["surfacemap"].found == 3
-    assert rows["surfacemap"].unique == frozenset({"a.example.com", "c.example.com"})
-    assert rows["surfacemap"].recall == pytest.approx(3 / 4)
+    assert rows["domain-mapper"].found == 3
+    assert rows["domain-mapper"].unique == frozenset({"a.example.com", "c.example.com"})
+    assert rows["domain-mapper"].recall == pytest.approx(3 / 4)
     assert rows["subfinder"].unique == frozenset({"d.example.com"})
     assert rows["subfinder"].recall == pytest.approx(2 / 4)
     assert rows["subfinder"].seconds == 8.0
@@ -112,7 +112,7 @@ def test_compare_reports_coverage_unique_finds_and_recall() -> None:
 
 
 def test_compare_with_no_findings_has_zero_recall_not_a_division_error() -> None:
-    rows = compare([ToolResult("surfacemap", frozenset(), 1.0, None)])
+    rows = compare([ToolResult("domain-mapper", frozenset(), 1.0, None)])
     assert rows[0].recall == 0.0
 
 
@@ -123,7 +123,7 @@ def test_subprocess_runner_returns_stdout_without_a_shell() -> None:
 
 def test_subprocess_runner_raises_when_the_binary_is_missing() -> None:
     with pytest.raises(ToolNotInstalledError):
-        subprocess_runner(("surfacemap-no-such-binary", "-d", APEX))
+        subprocess_runner(("domain-mapper-no-such-binary", "-d", APEX))
 
 
 def test_tool_commands_refuse_a_domain_that_would_become_a_flag() -> None:
@@ -180,7 +180,7 @@ def test_subprocess_runner_raises_on_a_non_zero_exit() -> None:
 
 
 def test_subprocess_runner_looks_only_in_the_explicit_search_path(tmp_path) -> None:
-    name = "surfacemap-fake-tool" + (".exe" if sys.platform == "win32" else "")
+    name = "domain-mapper-fake-tool" + (".exe" if sys.platform == "win32" else "")
     # The binary is looked up only in the given directory, never in the ambient PATH.
     with pytest.raises(ToolNotInstalledError):
         subprocess_runner((name, "-d", APEX), search_path=str(tmp_path))

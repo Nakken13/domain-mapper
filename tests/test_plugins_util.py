@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from surfacemap.collect.http import FetchError, is_ip_literal, parse_json
-from surfacemap.plugins._util import country_code, is_public_ip
-from surfacemap.scope import try_normalize_domain
+from domain_mapper.collect.http import FetchError, is_ip_literal, parse_json
+from domain_mapper.plugins._util import country_code, is_public_ip
+from domain_mapper.scope import try_normalize_domain
 
 
 def test_try_normalize_domain_returns_none_instead_of_raising() -> None:

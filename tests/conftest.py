@@ -10,12 +10,12 @@ from typing import Any
 
 import pytest
 
-from surfacemap.collect.cache import ResponseCache
-from surfacemap.collect.http import HttpClient
-from surfacemap.collect.ratelimit import RateLimiter
-from surfacemap.config import Settings
-from surfacemap.plugins.base import PluginContext, ScopeView
-from surfacemap.scope import Scope, ScopeEntry
+from domain_mapper.collect.cache import ResponseCache
+from domain_mapper.collect.http import HttpClient
+from domain_mapper.collect.ratelimit import RateLimiter
+from domain_mapper.config import Settings
+from domain_mapper.plugins.base import PluginContext, ScopeView
+from domain_mapper.scope import Scope, ScopeEntry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 TODAY = date(2026, 6, 1)

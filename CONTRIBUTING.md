@@ -1,4 +1,4 @@
-# CONTRIBUTING.md — SurfaceMap
+# CONTRIBUTING.md — domain-mapper
 
 ## Branches
 

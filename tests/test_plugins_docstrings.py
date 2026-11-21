@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-import surfacemap.plugins
+import domain_mapper.plugins
 
-PLUGIN_DIR = Path(surfacemap.plugins.__file__).parent
+PLUGIN_DIR = Path(domain_mapper.plugins.__file__).parent
 MODULES = sorted(p for p in PLUGIN_DIR.glob("*.py") if p.stem not in {"__init__", "base"})
 
 

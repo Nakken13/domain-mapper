@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from surfacemap.models import (
+from domain_mapper.models import (
     Domain,
     Finding,
     IPAddress,

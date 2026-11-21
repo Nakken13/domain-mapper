@@ -7,10 +7,10 @@ import httpx
 import pytest
 import respx
 
-from surfacemap.collect.http import FetchError
-from surfacemap.models import Domain, IPAddress, RelationType
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.rdap import BOOTSTRAP_URL, RdapPlugin, rdap_server
+from domain_mapper.collect.http import FetchError
+from domain_mapper.models import Domain, IPAddress, RelationType
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.rdap import BOOTSTRAP_URL, RdapPlugin, rdap_server
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 REGISTRY = "https://rdap.verisign.example/com/v1/domain/example.com"

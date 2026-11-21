@@ -1,4 +1,4 @@
-"""`surfacemap scan`: scope is checked before anything runs; the report is one HTML file."""
+"""`domain-mapper scan`: scope is checked before anything runs; the report is one HTML file."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from surfacemap import cli
-from surfacemap.models import (
+from domain_mapper import cli
+from domain_mapper.models import (
     Domain,
     Entity,
     IPAddress,
@@ -18,7 +18,7 @@ from surfacemap.models import (
     Relation,
     RelationType,
 )
-from surfacemap.plugins.base import PluginBase, PluginContext, PluginRegistry
+from domain_mapper.plugins.base import PluginBase, PluginContext, PluginRegistry
 
 runner = CliRunner()
 calls: list[str] = []
@@ -44,7 +44,7 @@ def _registry() -> PluginRegistry:
 def _fake_sources(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls.clear()
     monkeypatch.setattr(cli, "default_registry", _registry)
-    monkeypatch.setenv("SURFACEMAP_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("DOMAIN_MAPPER_CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.chdir(tmp_path)
 
 

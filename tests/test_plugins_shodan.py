@@ -9,11 +9,11 @@ import httpx
 import pytest
 import respx
 
-from surfacemap.collect.http import FetchError
-from surfacemap.config import Settings
-from surfacemap.models import ASN, Domain, IPAddress, RelationType, Technology
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.shodan import HOST_URL, ShodanPlugin
+from domain_mapper.collect.http import FetchError
+from domain_mapper.config import Settings
+from domain_mapper.models import ASN, Domain, IPAddress, RelationType, Technology
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.shodan import HOST_URL, ShodanPlugin
 
 KEY = "shodan-test-key-0123456789"  # fake, the tests check it never leaks
 IP = IPAddress(address="1.2.3.4")

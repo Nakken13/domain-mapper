@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph
-from surfacemap.models import Entity, Observation, Provenance, Relation
+from domain_mapper.graph.builder import SurfaceGraph, build_graph
+from domain_mapper.models import Entity, Observation, Provenance, Relation
 
 
 def graph_of(*items: Entity | Relation, source: str = "dns_records") -> SurfaceGraph:

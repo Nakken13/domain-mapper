@@ -3,8 +3,8 @@ from typing import Any
 
 import pytest
 
-from surfacemap.models import Domain, Entity, IPAddress, Observation
-from surfacemap.plugins.base import (
+from domain_mapper.models import Domain, Entity, IPAddress, Observation
+from domain_mapper.plugins.base import (
     ENTITY_KINDS,
     Plugin,
     PluginBase,
@@ -13,7 +13,7 @@ from surfacemap.plugins.base import (
     ScopeView,
     default_registry,
 )
-from surfacemap.scope import Scope, ScopeEntry
+from domain_mapper.scope import Scope, ScopeEntry
 
 TODAY = date(2026, 6, 1)
 
@@ -171,7 +171,7 @@ def test_ip_entities_are_not_domains_for_applies_to() -> None:
 
 
 def test_scope_view_require_uses_the_pinned_date() -> None:
-    from surfacemap.scope import OutOfScopeError
+    from domain_mapper.scope import OutOfScopeError
 
     view = scope_view()
     assert view.require("WWW.Example.com.") == "www.example.com"
@@ -190,4 +190,4 @@ def test_target_host_matches_every_idna_spelling(host: str) -> None:
 
 def test_engine_source_name_is_reserved() -> None:
     with pytest.raises(ValueError, match="reserved"):
-        PluginRegistry().register(make("surfacemap"))
+        PluginRegistry().register(make("domain-mapper"))

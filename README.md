@@ -20,7 +20,7 @@
 ⢀⣠⠁⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 </pre>
 
-# SurfaceMap
+# domain-mapper
 
 [![CI](https://github.com/Nakken13/domain-mapper/actions/workflows/ci.yml/badge.svg)](https://github.com/Nakken13/domain-mapper/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -37,8 +37,8 @@ py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .v
 .venv/Scripts/activate                      # Linux/macOS: source .venv/bin/activate
 python -m pip install -e ".[dev]"
 cp scope.example.yaml scope.yaml            # list ONLY domains you are authorized to assess
-surfacemap scope check example.com
-surfacemap scan example.com -o example.com-report.html   # needs network access to the public sources
+domain-mapper scope check example.com
+domain-mapper scan example.com -o example.com-report.html   # needs network access to the public sources
 ```
 
 Edit `scope.yaml` first: `example.com` is a placeholder, and entries can carry an `expires` date after
@@ -48,11 +48,11 @@ The report is a single self-contained HTML file (Cytoscape.js inlined): open it 
 
 ## Menu (TUI)
 
-Prefer a menu to flags? `surfacemap-tool` opens a numbered menu (banner, scope check, scan, open the last
+Prefer a menu to flags? `domain-mapper-tool` opens a numbered menu (banner, scope check, scan, open the last
 report). It needs an interactive terminal and the same `scope.yaml` in the current directory.
 
 ```bash
-surfacemap-tool
+domain-mapper-tool
 ```
 
 | Key | Action |
@@ -68,7 +68,7 @@ out-of-scope domain is refused without any request. If the command is not found 
 
 ## Demo
 
-![Report demo: surface graph, then risk findings](media/surfacemap-demo.gif)
+![Report demo: surface graph, then risk findings](media/domain-mapper-demo.gif)
 
 *Illustrative only: a fictional `example.com` surface (documentation IP ranges) with expiring certificates,
 a staging host and a dangling CNAME to an out-of-scope CDN. It is not a real scan, because the only authorized
@@ -92,7 +92,7 @@ flowchart LR
 Plugins never touch the graph: they return `Observation` objects and only `graph/builder.py`
 merges them. Every entry point goes through the scope guard first, and everything a plugin emits
 passes through `privacy.py` before entering the graph. Graph metrics (`graph/metrics.py`) and a Neo4j
-export exist as library modules but are not wired into `surfacemap scan` yet. Details: [docs/architecture.md](docs/architecture.md).
+export exist as library modules but are not wired into `domain-mapper scan` yet. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Sources and their limits
 

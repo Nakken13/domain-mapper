@@ -3,8 +3,8 @@ from itertools import permutations
 
 import pytest
 
-from surfacemap.graph.builder import SurfaceGraph, build_graph, merge_entities
-from surfacemap.models import (
+from domain_mapper.graph.builder import SurfaceGraph, build_graph, merge_entities
+from domain_mapper.models import (
     ASN,
     ArchivedURL,
     Certificate,

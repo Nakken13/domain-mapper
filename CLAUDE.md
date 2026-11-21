@@ -1,4 +1,4 @@
-# CLAUDE.md — SurfaceMap
+# CLAUDE.md — domain-mapper
 
 Passive attack-surface mapper (Python 3.11, Typer CLI). Invariants (passive only, scope first, no PII): `AGENTS.md` § Code rules — read before touching `plugins/`, `collect/`, `scope.py`, `privacy.py`. User wants each step explained (the why) before doing it: interview defense.
 
@@ -9,7 +9,7 @@ If `graphify-out/graph.json` exists: `graphify query "<question>"` before any ra
 ## Skill routing
 
 - Architecture/exploration before raw reading → `graphify`.
-- HTML report UI (`src/surfacemap/report/`): layout/redesign → `frontend-design`, `impeccable` for audit/touch-up; graph or chart in report/evaluation → `dataviz` before the code.
+- HTML report UI (`src/domain_mapper/report/`): layout/redesign → `frontend-design`, `impeccable` for audit/touch-up; graph or chart in report/evaluation → `dataviz` before the code.
 - Bug/failing test → `systematic-debugging` before any fix.
 - Feature or fix → `test-driven-development` (test before code). Ambiguous feature → `brainstorming` first.
 - 2+ independent tasks → `dispatching-parallel-agents`; workspace isolation → `using-git-worktrees`; in-session plan with independent tasks → `subagent-driven-development`.

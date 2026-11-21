@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.collect.cache import ResponseCache
-from surfacemap.collect.engine import Engine, EngineLimits
-from surfacemap.collect.http import HttpClient
-from surfacemap.collect.ratelimit import RateLimiter
-from surfacemap.config import Settings
-from surfacemap.models import (
+from domain_mapper.collect.cache import ResponseCache
+from domain_mapper.collect.engine import Engine, EngineLimits
+from domain_mapper.collect.http import HttpClient
+from domain_mapper.collect.ratelimit import RateLimiter
+from domain_mapper.config import Settings
+from domain_mapper.models import (
     ASN,
     Domain,
     Entity,
@@ -21,8 +21,8 @@ from surfacemap.models import (
     Relation,
     RelationType,
 )
-from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
-from surfacemap.scope import OutOfScopeError, Scope, ScopeEntry
+from domain_mapper.plugins.base import PluginBase, PluginContext, ScopeView
+from domain_mapper.scope import OutOfScopeError, Scope, ScopeEntry
 
 NOW = datetime(2026, 6, 1, tzinfo=UTC)
 Handler = Callable[[Entity], list[Observation]]
@@ -142,7 +142,7 @@ async def test_seed_is_a_node_even_without_results(ctx: PluginContext) -> None:
     graph = await Engine([], ctx).run("Example.COM.")
     node = graph.nodes["domain:example.com"]
     assert node.entity == dom("example.com")
-    assert node.sources == frozenset({"surfacemap"})
+    assert node.sources == frozenset({"domain-mapper"})
 
 
 async def test_new_subdomains_are_fed_back_to_dns(ctx: PluginContext) -> None:
@@ -353,7 +353,7 @@ async def test_non_observation_results_are_dropped(
 async def test_entity_whose_id_changes_under_redaction_does_not_crash_the_run(
     ctx: PluginContext,
 ) -> None:
-    from surfacemap.models import ArchivedURL
+    from domain_mapper.models import ArchivedURL
 
     url = ArchivedURL(
         host="www.example.com", path="/u/john.doe@example.org", first_seen=NOW, last_seen=NOW
@@ -516,7 +516,7 @@ async def test_crash_in_applies_to_is_isolated(
 async def test_passive_violation_is_logged_as_an_error(
     ctx: PluginContext, caplog: pytest.LogCaptureFixture
 ) -> None:
-    from surfacemap.collect.http import PassiveViolationError
+    from domain_mapper.collect.http import PassiveViolationError
 
     def contact_target(entity: Entity) -> list[Observation]:
         raise PassiveViolationError("refused")

@@ -6,7 +6,7 @@ import dns.name
 import dns.resolver
 import pytest
 
-from surfacemap.plugins._resolver import (
+from domain_mapper.plugins._resolver import (
     DnsAnswer,
     DnsError,
     DnspythonResolver,

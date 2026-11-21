@@ -15,7 +15,7 @@ flowchart LR
     rules -->|Finding| report
 ```
 
-Graph metrics (`graph/metrics.py`) and the Neo4j export are library modules, not wired into `surfacemap scan` yet.
+Graph metrics (`graph/metrics.py`) and the Neo4j export are library modules, not wired into `domain-mapper scan` yet.
 
 ## Design decisions
 

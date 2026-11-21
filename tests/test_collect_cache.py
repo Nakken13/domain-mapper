@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.collect.cache import ResponseCache
+from domain_mapper.collect.cache import ResponseCache
 
 
 class FakeClock:

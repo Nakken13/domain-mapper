@@ -1,6 +1,6 @@
 """TUI rendering: plain text without color, ANSI only when asked."""
 
-from surfacemap.tui import render
+from domain_mapper.tui import render
 
 
 def test_menu_lists_numbered_options_and_back_key():
@@ -32,7 +32,7 @@ def test_info_panel_contains_title_and_every_line():
 
 def test_prompt_is_plain_or_colored():
     plain = render.menu_prompt(color=False)
-    assert plain.startswith("surfacemap")
+    assert plain.startswith("domain-mapper")
     assert "\x1b" not in plain
     assert "\x1b[" in render.menu_prompt(color=True)
 
@@ -42,4 +42,4 @@ def test_ascii_fallback_when_stdout_cannot_encode_box_drawing(monkeypatch):
     text = render.render_menu("Main menu", ["Scan"])
     assert "╭" not in text  # rounded corner
     assert "+" in text
-    assert render.menu_prompt().startswith("surfacemap >")
+    assert render.menu_prompt().startswith("domain-mapper >")

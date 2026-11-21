@@ -5,11 +5,11 @@ import asyncio
 import pytest
 import respx
 
-from surfacemap.collect.http import PassiveViolationError
-from surfacemap.models import Domain, IPAddress, RelationType
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.rdap import BOOTSTRAP_URL
-from surfacemap.plugins.whois import IANA_WHOIS, SocketTransport, WhoisPlugin
+from domain_mapper.collect.http import PassiveViolationError
+from domain_mapper.models import Domain, IPAddress, RelationType
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.rdap import BOOTSTRAP_URL
+from domain_mapper.plugins.whois import IANA_WHOIS, SocketTransport, WhoisPlugin
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 

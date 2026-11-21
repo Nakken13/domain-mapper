@@ -1,4 +1,4 @@
-# Copy to `scope.yaml` (gitignored). SurfaceMap refuses any domain not listed here.
+# Copy to `scope.yaml` (gitignored). domain-mapper refuses any domain not listed here.
 # List ONLY domains you own or have a WRITTEN authorization to assess
 # (unauthorized access attempts: French Penal Code, art. 323-1).
 

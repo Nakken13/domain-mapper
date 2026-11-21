@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from risk_helpers import graph_of
-from surfacemap.models import (
+from domain_mapper.models import (
     ASN,
     Domain,
     Entity,
@@ -15,8 +15,8 @@ from surfacemap.models import (
     RelationType,
     Severity,
 )
-from surfacemap.risk import RuleContext
-from surfacemap.risk.hosting import MIN_PROVIDERS, HostingSprawlRule, provider_key
+from domain_mapper.risk import RuleContext
+from domain_mapper.risk.hosting import MIN_PROVIDERS, HostingSprawlRule, provider_key
 
 
 def check(*items: Entity | Relation) -> tuple[Finding, ...]:

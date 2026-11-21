@@ -1,14 +1,14 @@
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 
-from surfacemap.evaluation.sources import (
+from domain_mapper.evaluation.sources import (
     render_venn_svg,
     source_counts,
     subdomains_by_source,
     venn_regions,
 )
-from surfacemap.graph.builder import build_graph
-from surfacemap.models import Domain, IPAddress, Observation, Provenance
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.models import Domain, IPAddress, Observation, Provenance
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 APEX = "example.com"

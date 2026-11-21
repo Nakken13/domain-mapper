@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from surfacemap.models import (
+from domain_mapper.models import (
     ASN,
     ArchivedURL,
     Certificate,
@@ -13,7 +13,7 @@ from surfacemap.models import (
     Relation,
     Technology,
 )
-from surfacemap.privacy import (
+from domain_mapper.privacy import (
     drop_email_sans,
     redact_observation,
     redact_registration,

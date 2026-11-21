@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.config import Settings
-from surfacemap.models import Domain, IPAddress
-from surfacemap.plugins import geoip
-from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
-from surfacemap.plugins.geoip import DATASET_NAMES, GeoipPlugin
+from domain_mapper.config import Settings
+from domain_mapper.models import Domain, IPAddress
+from domain_mapper.plugins import geoip
+from domain_mapper.plugins.base import Plugin, PluginContext, ScopeView, default_registry
+from domain_mapper.plugins.geoip import DATASET_NAMES, GeoipPlugin
 
 DATASET = Path(__file__).parent / "fixtures" / "ip2country.tsv"
 

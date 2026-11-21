@@ -7,10 +7,10 @@ import httpx
 import pytest
 import respx
 
-from surfacemap import __version__
-from surfacemap.collect.cache import ResponseCache
-from surfacemap.collect.http import USER_AGENT, FetchError, HttpClient, PassiveViolationError
-from surfacemap.collect.ratelimit import RateLimit, RateLimiter
+from domain_mapper import __version__
+from domain_mapper.collect.cache import ResponseCache
+from domain_mapper.collect.http import USER_AGENT, FetchError, HttpClient, PassiveViolationError
+from domain_mapper.collect.ratelimit import RateLimit, RateLimiter
 
 URL = "https://crt.sh/"
 SECRET = "sk-very-secret-123"  # noqa: S105 - fake key, the test checks it never leaks
@@ -65,7 +65,7 @@ async def test_returns_body_and_sends_honest_user_agent(client: HttpClient) -> N
     assert body == "[]"
     sent = route.calls.last.request.headers["user-agent"]
     assert sent == USER_AGENT
-    assert sent.startswith(f"SurfaceMap/{__version__}")
+    assert sent.startswith(f"domain-mapper/{__version__}")
 
 
 @respx.mock
@@ -195,8 +195,8 @@ async def test_secret_params_are_not_part_of_the_cache_key(
 
 @respx.mock
 async def test_idn_target_is_refused_whatever_its_spelling(tmp_path: Path) -> None:
-    from surfacemap.plugins.base import ScopeView
-    from surfacemap.scope import Scope, ScopeEntry
+    from domain_mapper.plugins.base import ScopeView
+    from domain_mapper.scope import Scope, ScopeEntry
 
     entries = [
         ScopeEntry(domain="bücher.example", authorization="x"),

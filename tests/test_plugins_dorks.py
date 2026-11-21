@@ -4,9 +4,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from surfacemap.plugins.base import ScopeView, default_registry
-from surfacemap.plugins.dorks import CATEGORIES, Dork, generate_dorks
-from surfacemap.scope import OutOfScopeError
+from domain_mapper.plugins.base import ScopeView, default_registry
+from domain_mapper.plugins.dorks import CATEGORIES, Dork, generate_dorks
+from domain_mapper.scope import OutOfScopeError
 
 
 def test_builds_search_links_for_an_in_scope_domain(scope_view: ScopeView) -> None:

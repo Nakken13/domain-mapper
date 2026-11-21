@@ -1,4 +1,4 @@
-# AGENTS.md — SurfaceMap
+# AGENTS.md — domain-mapper
 
 Invariants guide + repo map for any agent (Claude Code or other) working on
 this project.
@@ -14,7 +14,7 @@ Typer (CLI), httpx + asyncio (collection), pydantic / pydantic-settings
 ## Repository map
 
 ```text
-src/surfacemap/
+src/domain_mapper/
   cli.py, config.py     Typer CLI, settings loaded from .env
   scope.py              scope.yaml guard: refuses any out-of-scope domain
   privacy.py            personal-data filters (whois contacts, emails, query strings)
@@ -40,7 +40,7 @@ py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .v
 .venv/Scripts/python -m pip install -e ".[dev]"
 .venv/Scripts/python -m pytest              # tests + coverage gate (80 %)
 .venv/Scripts/ruff check . && .venv/Scripts/ruff format --check .
-.venv/Scripts/surfacemap scope check www.logan-villard.fr   # needs ./scope.yaml (gitignored)
+.venv/Scripts/domain-mapper scope check www.logan-villard.fr   # needs ./scope.yaml (gitignored)
 ```
 
 Do not pipe rich/typer output into `head` on Windows: the closed pipe raises a

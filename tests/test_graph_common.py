@@ -2,12 +2,12 @@ from datetime import UTC, datetime
 
 import pytest
 
-from surfacemap.graph._common import kind_of, label_of
-from surfacemap.graph.builder import build_graph
-from surfacemap.graph.export import to_networkx
-from surfacemap.graph.metrics import compute_metrics
-from surfacemap.graph.neo4j_export import cypher_statements
-from surfacemap.models import Certificate, Domain, IPAddress, Observation, Provenance, Relation
+from domain_mapper.graph._common import kind_of, label_of
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.graph.export import to_networkx
+from domain_mapper.graph.metrics import compute_metrics
+from domain_mapper.graph.neo4j_export import cypher_statements
+from domain_mapper.models import Certificate, Domain, IPAddress, Observation, Provenance, Relation
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 WWW = Domain(fqdn="www.example.com", in_scope=True)

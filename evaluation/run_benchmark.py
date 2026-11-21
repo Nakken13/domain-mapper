@@ -20,9 +20,9 @@ from datetime import date
 from functools import partial
 from pathlib import Path
 
-from surfacemap.cli import _collect
-from surfacemap.config import Settings
-from surfacemap.evaluation.benchmark import (
+from domain_mapper.cli import _collect
+from domain_mapper.config import Settings
+from domain_mapper.evaluation.benchmark import (
     TOOL_COMMANDS,
     ToolResult,
     compare,
@@ -30,13 +30,13 @@ from surfacemap.evaluation.benchmark import (
     run_tool,
     subprocess_runner,
 )
-from surfacemap.evaluation.sources import subdomains_by_source
-from surfacemap.scope import OutOfScopeError, Scope, ScopeFileError
+from domain_mapper.evaluation.sources import subdomains_by_source
+from domain_mapper.scope import OutOfScopeError, Scope, ScopeFileError
 
 META = "results.json"  # {tool: {"seconds": float, "error": str | null}}
 
 
-def surfacemap_result(root: str, scope: Scope, out: Path, today: date) -> ToolResult:
+def domain_mapper_result(root: str, scope: Scope, out: Path, today: date) -> ToolResult:
     start = time.monotonic()
     graph = asyncio.run(_collect(root, scope, Settings(), today))
     seconds = time.monotonic() - start
@@ -45,8 +45,8 @@ def surfacemap_result(root: str, scope: Scope, out: Path, today: date) -> ToolRe
     raw = "\n".join(sorted(found)) + "\n"
     # Which plugin saw what: the data behind the per-source counts for this run.
     per_source = {source: sorted(fqdns) for source, fqdns in sorted(by_source.items())}
-    (out / "surfacemap-by-source.json").write_text(json.dumps(per_source, indent=2) + "\n")
-    return ToolResult("surfacemap", found, seconds, None, raw=raw)
+    (out / "domain-mapper-by-source.json").write_text(json.dumps(per_source, indent=2) + "\n")
+    return ToolResult("domain-mapper", found, seconds, None, raw=raw)
 
 
 def table(results: list[ToolResult]) -> str:
@@ -111,7 +111,7 @@ def main() -> int:
         if args.tool_dir:
             search_path = f"{args.tool_dir}{os.pathsep}{search_path}"
         runner = partial(subprocess_runner, search_path=search_path)
-        results = [surfacemap_result(root, scope, args.out, today)]
+        results = [domain_mapper_result(root, scope, args.out, today)]
         results += [run_tool(name, root, runner) for name in TOOL_COMMANDS]
         save(results, args.out)
 

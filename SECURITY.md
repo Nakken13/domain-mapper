@@ -1,4 +1,4 @@
-# SECURITY.md — SurfaceMap
+# SECURITY.md — domain-mapper
 
 ## Secrets
 

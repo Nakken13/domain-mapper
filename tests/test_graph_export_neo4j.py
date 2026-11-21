@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from surfacemap.graph.builder import build_graph
-from surfacemap.graph.neo4j_export import cypher_statements, push_to_neo4j
-from surfacemap.models import Domain, IPAddress, Observation, Provenance, Relation
+from domain_mapper.graph.builder import build_graph
+from domain_mapper.graph.neo4j_export import cypher_statements, push_to_neo4j
+from domain_mapper.models import Domain, IPAddress, Observation, Provenance, Relation
 
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 WWW = Domain(fqdn="www.example.com", in_scope=True)
@@ -75,7 +75,7 @@ def test_push_runs_every_statement_through_the_given_driver() -> None:
 
 
 def test_push_rejects_unsafe_label() -> None:
-    from surfacemap.graph.neo4j_export import _label
+    from domain_mapper.graph.neo4j_export import _label
 
     with pytest.raises(ValueError, match="unsafe Cypher identifier"):
         _label("bad`label")

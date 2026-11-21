@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from surfacemap.scope import (
+from domain_mapper.scope import (
     InvalidDomainError,
     OutOfScopeError,
     Scope,

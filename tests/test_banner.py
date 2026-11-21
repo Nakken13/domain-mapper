@@ -4,15 +4,15 @@ import os
 
 import pytest
 
-from surfacemap import __version__
-from surfacemap.banner import banner
+from domain_mapper import __version__
+from domain_mapper.banner import banner
 
 
 @pytest.fixture
 def terminal(monkeypatch):
     def _set(columns: int) -> None:
         monkeypatch.setattr(
-            "surfacemap.banner.shutil.get_terminal_size",
+            "domain_mapper.banner.shutil.get_terminal_size",
             lambda fallback=(80, 24): os.terminal_size((columns, 24)),
         )
 

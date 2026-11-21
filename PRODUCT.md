@@ -1,4 +1,4 @@
-# PRODUCT.md — SurfaceMap
+# PRODUCT.md — domain-mapper
 
 ## Vision
 

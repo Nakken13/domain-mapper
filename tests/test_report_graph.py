@@ -6,9 +6,9 @@ import json
 import re
 
 from risk_helpers import graph_of
-from surfacemap.models import Domain, IPAddress, Relation, RelationType
-from surfacemap.report import render_report
-from surfacemap.report.graphdata import graph_elements, to_script_json
+from domain_mapper.models import Domain, IPAddress, Relation, RelationType
+from domain_mapper.report import render_report
+from domain_mapper.report.graphdata import graph_elements, to_script_json
 
 
 def _graph():
@@ -49,8 +49,8 @@ def test_elements_flag_nodes_outside_the_scope() -> None:
 
 def test_every_entity_kind_has_a_distinct_colour() -> None:
     """A kind without a colour would silently render grey (it happened once)."""
-    from surfacemap.graph._common import _BY_PREFIX
-    from surfacemap.report.graphdata import KIND_COLORS
+    from domain_mapper.graph._common import _BY_PREFIX
+    from domain_mapper.report.graphdata import KIND_COLORS
 
     kinds = {kind for kind, _label in _BY_PREFIX.values()}
     assert set(KIND_COLORS) == kinds
@@ -58,7 +58,7 @@ def test_every_entity_kind_has_a_distinct_colour() -> None:
 
 
 def test_elements_carry_the_colour_of_their_kind() -> None:
-    from surfacemap.report.graphdata import KIND_COLORS
+    from domain_mapper.report.graphdata import KIND_COLORS
 
     nodes = {n["id"]: n for n in graph_elements(_graph())["nodes"]}
     assert nodes["domain:app.example.com"]["color"] == KIND_COLORS["domain"]
@@ -95,7 +95,7 @@ def test_vendored_cytoscape_matches_the_pinned_hash() -> None:
     import hashlib
     from importlib.resources import files
 
-    blob = (files("surfacemap.report") / "vendor" / "cytoscape.min.js").read_bytes()
+    blob = (files("domain_mapper.report") / "vendor" / "cytoscape.min.js").read_bytes()
     assert (
         hashlib.sha256(blob).hexdigest()
         == "f55947f3daa3bae53209d4b885c195c157f595c225e508a6b382598d9452d6e2"

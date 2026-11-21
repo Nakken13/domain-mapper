@@ -27,7 +27,7 @@
 
 ## Evaluation
 
-SurfaceMap is compared with Amass and Subfinder in passive mode on a domain owned by the author:
+domain-mapper is compared with Amass and Subfinder in passive mode on a domain owned by the author:
 per-source counts and Venn, then one timed run per tool with raw output stored untouched.
 Recall is **relative to the union** of all tools (no ground truth exists), failed runs are `n/a`
 not zero, and scoring is recomputed offline from stored outputs. The one valid run found a single
