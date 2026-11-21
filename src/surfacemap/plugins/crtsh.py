@@ -81,6 +81,7 @@ class CrtshPlugin(PluginBase):
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, Domain):
             return []
+        deadline = asyncio.get_running_loop().time() + DOWNLOAD_BUDGET
         root = entity.fqdn
         query = f"%.{root}"
         body = await ctx.http.get_text(
@@ -103,8 +104,10 @@ class CrtshPlugin(PluginBase):
             )
         ]
         try:
-            async with asyncio.timeout(DOWNLOAD_BUDGET):
+            async with asyncio.timeout_at(deadline):
                 for candidate in _valid_certificates(root, rows, ctx.scope.today):
+                    if asyncio.get_running_loop().time() >= deadline:
+                        raise TimeoutError  # cancellation may not land before the next await
                     certificate = await self._download(candidate, ctx)
                     if certificate is not None:
                         observations.append(certificate)

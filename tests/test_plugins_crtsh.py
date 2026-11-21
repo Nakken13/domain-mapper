@@ -303,6 +303,26 @@ async def test_downloads_stop_at_their_time_budget_and_keep_results(
 
 
 @respx.mock
+async def test_time_budget_counts_from_the_start_of_the_call(
+    plugin_ctx: PluginContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(crtsh, "DOWNLOAD_BUDGET", 0.3)
+    search = mock_crtsh([row(1, "2026-05-02T00:00:00", "2026-08-01T00:00:00")])
+
+    async def slow_search(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0.35)  # the search alone exhausts the budget
+        return httpx.Response(200, json=[row(1, "2026-05-02T00:00:00", "2026-08-01T00:00:00")])
+
+    search.mock(side_effect=slow_search)
+    pem = mock_pem(1, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+
+    observations = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert len(observations) == 1  # subdomains kept, no download attempted
+    assert not pem.called
+
+
+@respx.mock
 async def test_a_precertificate_and_its_certificate_count_once(plugin_ctx: PluginContext) -> None:
     precert = {**row(10, "2026-05-01T00:00:00", "2026-08-01T00:00:00"), "serial_number": "0abc"}
     leaf = {**row(11, "2026-05-01T00:00:00", "2026-08-01T00:00:00"), "serial_number": "0abc"}
