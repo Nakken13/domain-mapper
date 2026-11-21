@@ -15,5 +15,5 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(report): interactive graph with Cytoscape.js inlined (MIT, no CDN; keep licence notice)
 - [x] feat(report): findings table by severity
 - [x] feat(cli): `surfacemap scan` command end-to-end (scope.require first)
-- [ ] test(report): visual check at desktop + mobile width (human validation; PAUSED/ if needed)
+- [x] test(report): visual check at desktop + mobile width (human validation; PAUSED/ if needed)
 - [ ] Review + merge branch into main
