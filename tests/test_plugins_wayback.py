@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 import respx
 
-from surfacemap.collect.http import FetchError
+from surfacemap.collect.cache import ResponseCache
+from surfacemap.collect.http import FetchError, HttpClient
+from surfacemap.collect.ratelimit import RateLimiter
+from surfacemap.config import Settings
 from surfacemap.models import ArchivedURL, Domain, IPAddress, RelationType
 from surfacemap.plugins.base import Plugin, PluginContext, ScopeView, default_registry
 from surfacemap.plugins.wayback import CDX_URL, WaybackPlugin
+from surfacemap.scope import Scope, ScopeEntry
 
 ROOT = Domain(fqdn="example.com", in_scope=True)
 
@@ -91,3 +96,54 @@ async def test_unexpected_payload_is_a_fetch_error(plugin_ctx: PluginContext) ->
 
 async def test_ignores_entities_that_are_not_domains(plugin_ctx: PluginContext) -> None:
     assert await WaybackPlugin().run(IPAddress(address="192.0.2.1"), plugin_ctx) == []
+
+
+@respx.mock
+async def test_path_parameters_and_encoded_delimiters_are_cut(plugin_ctx: PluginContext) -> None:
+    mock_cdx(
+        [
+            ["timestamp", "original"],
+            ["20200101000000", "https://example.com/app;jsessionid=SECRET1"],
+            ["20200101000000", "https://example.com/dl%3Ftoken=SECRET2"],
+            ["20200101000000", "https://example.com/doc%23SECRET3"],
+            ["20200101000000", "https://example.com/;SECRET4"],
+        ]
+    )
+    [observation] = await WaybackPlugin().run(ROOT, plugin_ctx)
+    paths = sorted(e.path for e in observation.entities if isinstance(e, ArchivedURL))
+    assert paths == ["/", "/app", "/dl", "/doc"]
+    assert "SECRET" not in observation.model_dump_json()
+
+
+@respx.mock
+async def test_out_of_scope_hosts_are_recorded_but_not_enriched(
+    tmp_path: Path, scope_view: ScopeView
+) -> None:
+    view = ScopeView(
+        Scope([ScopeEntry(domain="example.com", include_subdomains=False, authorization="t")]),
+        scope_view.today,
+    )
+    mock_cdx(
+        [
+            ["timestamp", "original"],
+            ["20200101000000", "https://example.com/home"],
+            ["20200101000000", "https://staging.example.com/admin"],
+        ]
+    )
+    with ResponseCache(tmp_path / "c.sqlite", ttl=timedelta(hours=1)) as cache:
+        limiter = RateLimiter({})
+        ctx = PluginContext(
+            http=HttpClient(limiter, cache, view.is_target_host),
+            cache=cache,
+            limiter=limiter,
+            settings=Settings(_env_file=None),
+            scope=view,
+        )
+        [observation] = await WaybackPlugin().run(ROOT, ctx)
+
+    ids = sorted(e.id for e in observation.entities)
+    assert ids == ["domain:example.com", "domain:staging.example.com", "url:example.com/home"]
+    staging = next(e for e in observation.entities if e.id == "domain:staging.example.com")
+    assert isinstance(staging, Domain)
+    assert staging.in_scope is False
+    assert [r.target for r in observation.relations] == ["url:example.com/home"]
