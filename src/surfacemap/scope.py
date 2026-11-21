@@ -33,6 +33,14 @@ class OutOfScopeError(PermissionError):
     """The requested domain is not covered by a valid authorization."""
 
 
+def try_normalize_domain(raw: str) -> str | None:
+    """`normalize_domain`, or None when `raw` is not a valid hostname."""
+    try:
+        return normalize_domain(raw)
+    except InvalidDomainError:
+        return None
+
+
 def normalize_domain(raw: str) -> str:
     """Return the canonical ASCII form of a hostname, or raise InvalidDomainError."""
     name = raw.strip().lower().removesuffix(".")

@@ -14,37 +14,41 @@ edges); TLDs without an RDAP server are left to the WHOIS fallback.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from typing import Any
 
-from surfacemap.collect.http import FetchError
-from surfacemap.models import Domain, Entity, Observation, Provenance, Relation, RelationType
-from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
+from surfacemap.collect.http import FetchError, parse_json
+from surfacemap.models import Domain, Entity, Observation, Relation, RelationType
+from surfacemap.plugins.base import PluginBase, PluginContext, RootOnlyPlugin
 from surfacemap.privacy import redact_registration
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.scope import try_normalize_domain
 
 BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json"
 SOURCE = "rdap"
 
 
-def _json(body: str) -> Any:
-    try:
-        return json.loads(body)
-    except json.JSONDecodeError:
-        raise FetchError(f"{SOURCE}: unexpected payload") from None
-
-
 def _redacted(body: str) -> str:
-    payload = _json(body)
-    if not isinstance(payload, dict):
-        raise FetchError(f"{SOURCE}: unexpected payload")
-    return json.dumps(redact_registration(payload))
+    return json.dumps(redact_registration(parse_json(body, SOURCE, dict)))
+
+
+def ns_observation(
+    plugin: PluginBase, root: str, servers: list[str], query: str, ctx: PluginContext
+) -> Observation:
+    """`root` NS `servers`: shared by RDAP and its WHOIS fallback."""
+    domain = Domain(fqdn=root, in_scope=ctx.scope.is_in_scope(root))
+    targets = [Domain(fqdn=ns, in_scope=ctx.scope.is_in_scope(ns)) for ns in servers]
+    return Observation(
+        provenance=plugin.provenance(query),
+        entities=(domain, *targets),
+        relations=tuple(Relation.between(domain, RelationType.NS, ns) for ns in targets),
+    )
 
 
 async def rdap_server(domain: str, ctx: PluginContext) -> str | None:
     """Base URL of the HTTPS RDAP server for the TLD of `domain`, or None."""
-    bootstrap = _json(await ctx.http.get_text(SOURCE, BOOTSTRAP_URL, query="rdap bootstrap"))
-    services = bootstrap.get("services") if isinstance(bootstrap, dict) else None
+    bootstrap = parse_json(
+        await ctx.http.get_text(SOURCE, BOOTSTRAP_URL, query="rdap bootstrap"), SOURCE, dict
+    )
+    services = bootstrap.get("services")
     if not isinstance(services, list):
         raise FetchError(f"{SOURCE}: unexpected payload")
     tld = domain.lower().rstrip(".").rsplit(".", 1)[-1]
@@ -64,21 +68,15 @@ def _name_servers(payload: Any) -> list[str]:
     entries = payload.get("nameservers") if isinstance(payload, dict) else None
     for entry in entries if isinstance(entries, list) else []:
         name = entry.get("ldhName") if isinstance(entry, dict) else None
-        if isinstance(name, str):
-            try:
-                servers.add(normalize_domain(name))
-            except InvalidDomainError:
-                continue
+        if isinstance(name, str) and (host := try_normalize_domain(name)):
+            servers.add(host)
     return sorted(servers)
 
 
-class RdapPlugin(PluginBase):
+class RdapPlugin(RootOnlyPlugin):
     name = SOURCE
     consumes = frozenset({"domain"})
     runs_out_of_scope = False
-
-    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
-        return isinstance(entity, Domain) and scope.root_of(entity.fqdn) == entity.fqdn
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, Domain):
@@ -95,17 +93,7 @@ class RdapPlugin(PluginBase):
             headers={"Accept": "application/rdap+json"},
             redact=_redacted,
         )
-        servers = [ns for ns in _name_servers(_json(body)) if ns != root]
+        servers = [ns for ns in _name_servers(parse_json(body, SOURCE, dict)) if ns != root]
         if not servers:
             return []
-        domain = Domain(fqdn=root, in_scope=ctx.scope.is_in_scope(root))
-        targets = [Domain(fqdn=ns, in_scope=ctx.scope.is_in_scope(ns)) for ns in servers]
-        return [
-            Observation(
-                provenance=Provenance(
-                    source=self.name, retrieved_at=datetime.now(UTC), query=query
-                ),
-                entities=(domain, *targets),
-                relations=tuple(Relation.between(domain, RelationType.NS, ns) for ns in targets),
-            )
-        ]
+        return [ns_observation(self, root, servers, query, ctx)]

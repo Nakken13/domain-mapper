@@ -15,12 +15,10 @@ Open ports have no model yet, and the address country is left to the geoip plugi
 
 from __future__ import annotations
 
-import ipaddress
 import json
-from datetime import UTC, datetime
 from typing import Any
 
-from surfacemap.collect.http import FetchError
+from surfacemap.collect.http import parse_json
 from surfacemap.config import Settings
 from surfacemap.models import (
     ASN,
@@ -28,26 +26,20 @@ from surfacemap.models import (
     Entity,
     IPAddress,
     Observation,
-    Provenance,
     Relation,
     RelationType,
     Technology,
 )
+from surfacemap.plugins._util import is_public_ip
 from surfacemap.plugins.base import PluginBase, PluginContext
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.scope import try_normalize_domain
 
 HOST_URL = "https://api.shodan.io/shodan/host/{ip}"
 _BANNER_FIELDS = ("port", "transport", "product", "version", "hostnames")
 
 
 def _payload(body: str) -> dict[str, Any]:
-    try:
-        payload = json.loads(body)
-    except json.JSONDecodeError:
-        payload = None
-    if not isinstance(payload, dict):
-        raise FetchError("shodan: unexpected payload")
-    return payload
+    return parse_json(body, "shodan", dict)
 
 
 def _minimize(body: str) -> str:
@@ -88,7 +80,7 @@ class ShodanPlugin(PluginBase):
         key = ctx.settings.shodan_api_key
         if not isinstance(entity, IPAddress) or key is None:
             return []
-        if not ipaddress.ip_address(entity.address).is_global:
+        if not is_public_ip(entity.address):
             return []
         query = f"shodan host {entity.address}"
         payload = _payload(
@@ -105,11 +97,8 @@ class ShodanPlugin(PluginBase):
     def _in_scope(self, names: object, ctx: PluginContext) -> list[str]:
         kept: set[str] = set()
         for raw in names if isinstance(names, list) else []:
-            try:
-                name = normalize_domain(str(raw))
-            except InvalidDomainError:
-                continue
-            if ctx.scope.is_in_scope(name):
+            name = try_normalize_domain(str(raw))
+            if name and ctx.scope.is_in_scope(name):
                 kept.add(name)
         return sorted(kept)
 
@@ -144,9 +133,7 @@ class ShodanPlugin(PluginBase):
             return []
         return [
             Observation(
-                provenance=Provenance(
-                    source=self.name, retrieved_at=datetime.now(UTC), query=query
-                ),
+                provenance=self.provenance(query),
                 entities=(ip, *entities),
                 relations=tuple(relations),
             )

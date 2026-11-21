@@ -19,18 +19,15 @@ import bisect
 import gzip
 import ipaddress
 import logging
-import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 
 from surfacemap.config import Settings
-from surfacemap.models import Entity, IPAddress, Observation, Provenance
+from surfacemap.models import Entity, IPAddress, Observation
+from surfacemap.plugins._util import country_code
 from surfacemap.plugins.base import PluginBase, PluginContext
 
 DATASET_NAMES = ("ip2country.tsv", "ip2country.tsv.gz")
-_COUNTRY = re.compile(r"^[A-Za-z]{2}$")
-
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +52,7 @@ def _load(path: Path) -> dict[int, _Ranges]:
     with opener(path, "rt", encoding="utf-8") as lines:
         for line in lines:
             parts = line.rstrip("\n").split("\t")
-            if len(parts) < 3 or not _COUNTRY.match(parts[2]):
+            if len(parts) < 3 or country_code(parts[2]) is None:
                 continue  # header, unrouted range ("None") or malformed line
             try:
                 start, end = ipaddress.ip_address(parts[0]), ipaddress.ip_address(parts[1])
@@ -80,6 +77,7 @@ class GeoipPlugin(PluginBase):
     def __init__(self, dataset: Path | None = None) -> None:
         self.dataset = dataset
         self._loaded: dict[Path, dict[int, _Ranges]] = {}
+        self._load_lock = asyncio.Lock()  # concurrent first runs must parse the file once
 
     def _path(self, settings: Settings) -> Path | None:
         candidates = (
@@ -97,8 +95,9 @@ class GeoipPlugin(PluginBase):
         path = self._path(settings)
         if path is None:
             return None
-        if path not in self._loaded:
-            self._loaded[path] = await asyncio.to_thread(_load, path)
+        async with self._load_lock:
+            if path not in self._loaded:
+                self._loaded[path] = await asyncio.to_thread(_load, path)
         return self._loaded[path]
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
@@ -113,11 +112,7 @@ class GeoipPlugin(PluginBase):
             return []
         return [
             Observation(
-                provenance=Provenance(
-                    source=self.name,
-                    retrieved_at=datetime.now(UTC),
-                    query=f"ip2country {entity.address}",
-                ),
+                provenance=self.provenance(f"ip2country {entity.address}"),
                 entities=(IPAddress(address=entity.address, country=country),),
             )
         ]

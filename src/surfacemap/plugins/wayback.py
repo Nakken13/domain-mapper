@@ -22,19 +22,18 @@ from functools import partial
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-from surfacemap.collect.http import FetchError
+from surfacemap.collect.http import parse_json
 from surfacemap.models import (
     ArchivedURL,
     Domain,
     Entity,
     Observation,
-    Provenance,
     Relation,
     RelationType,
 )
-from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
+from surfacemap.plugins.base import PluginContext, RootOnlyPlugin
 from surfacemap.privacy import REDACTED_EMAIL, scrub_emails, strip_query
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.scope import try_normalize_domain
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +48,10 @@ _PATH_CUT = re.compile(r";|%3b|%3f|%23|%25", re.IGNORECASE)
 _Span = tuple[datetime, datetime]
 
 
-class WaybackPlugin(PluginBase):
+class WaybackPlugin(RootOnlyPlugin):
     name = "wayback"
     consumes = frozenset({"domain"})
     runs_out_of_scope = False
-
-    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
-        return isinstance(entity, Domain) and scope.root_of(entity.fqdn) == entity.fqdn
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, Domain):
@@ -91,9 +87,7 @@ class WaybackPlugin(PluginBase):
         ]
         return [
             Observation(
-                provenance=Provenance(
-                    source=self.name, retrieved_at=datetime.now(UTC), query=f"{root}/*"
-                ),
+                provenance=self.provenance(f"{root}/*"),
                 entities=(*hosts.values(), *urls),
                 relations=tuple(
                     Relation.between(hosts[url.host], RelationType.ARCHIVED_AT, url) for url in urls
@@ -103,13 +97,7 @@ class WaybackPlugin(PluginBase):
 
 
 def _rows(body: str) -> list[Any]:
-    try:
-        rows = json.loads(body)
-    except json.JSONDecodeError:
-        rows = None
-    if not isinstance(rows, list):
-        raise FetchError("wayback: unexpected payload")
-    return rows[1:]  # the first row is the field header
+    return parse_json(body, "wayback", list)[1:]  # the first row is the field header
 
 
 def _minimize(root: str, body: str) -> str:
@@ -141,11 +129,8 @@ def _location(root: str, original: str) -> tuple[str, str] | None:
     parts = urlsplit(strip_query(original))
     if parts.scheme not in ("http", "https") or not parts.hostname:
         return None
-    try:
-        host = normalize_domain(parts.hostname)
-    except InvalidDomainError:
-        return None
-    if host != root and not host.endswith("." + root):
+    host = try_normalize_domain(parts.hostname)
+    if host is None or (host != root and not host.endswith("." + root)):
         return None
     # Emails in a path (`/unsubscribe/jane@…`) are scrubbed here, before the cache.
     path = _PATH_CUT.split(_redact_email_segments(parts.path), maxsplit=1)[0]

@@ -30,19 +30,18 @@ from datetime import UTC, date, datetime
 from functools import partial
 from typing import Any
 
-from surfacemap.collect.http import FetchError
+from surfacemap.collect.http import FetchError, parse_json
 from surfacemap.models import (
     Certificate,
     Domain,
     Entity,
     Observation,
-    Provenance,
     Relation,
     RelationType,
 )
-from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
+from surfacemap.plugins.base import PluginContext, RootOnlyPlugin
 from surfacemap.privacy import scrub_emails
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.scope import try_normalize_domain
 
 CRTSH_URL = "https://crt.sh/"
 MAX_CERTIFICATES = 50
@@ -70,13 +69,10 @@ class _Candidate:
     sans: tuple[str, ...]
 
 
-class CrtshPlugin(PluginBase):
+class CrtshPlugin(RootOnlyPlugin):
     name = "crtsh"
     consumes = frozenset({"domain"})
     runs_out_of_scope = False
-
-    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
-        return isinstance(entity, Domain) and scope.root_of(entity.fqdn) == entity.fqdn
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
         if not isinstance(entity, Domain):
@@ -97,7 +93,7 @@ class CrtshPlugin(PluginBase):
             return []
         observations = [
             Observation(
-                provenance=_provenance(self.name, query),
+                provenance=self.provenance(query),
                 entities=tuple(
                     Domain(fqdn=name, in_scope=ctx.scope.is_in_scope(name)) for name in names
                 ),
@@ -138,7 +134,7 @@ class CrtshPlugin(PluginBase):
         # Same policy as wayback: an out-of-scope host is recorded, never enriched.
         hosts = sorted({h for san in candidate.sans if ctx.scope.is_in_scope(h := _host(san))})
         return Observation(
-            provenance=_provenance(self.name, query),
+            provenance=self.provenance(query),
             entities=(certificate,),
             relations=tuple(
                 Relation(
@@ -149,18 +145,8 @@ class CrtshPlugin(PluginBase):
         )
 
 
-def _provenance(source: str, query: str) -> Provenance:
-    return Provenance(source=source, retrieved_at=datetime.now(UTC), query=query)
-
-
 def _rows(body: str) -> list[Any]:
-    try:
-        rows = json.loads(body)
-    except json.JSONDecodeError:
-        rows = None
-    if not isinstance(rows, list):
-        raise FetchError("crtsh: unexpected payload")
-    return rows
+    return parse_json(body, "crtsh", list)
 
 
 def _minimize(root: str, body: str) -> str:
@@ -207,11 +193,8 @@ def _fingerprint(pem: str) -> str:
 def _hostname(root: str, identity: str) -> str | None:
     """The normalized hostname an identity line names (`*.` stripped) when it is `root` or
     below it, None otherwise (not a hostname, or a co-tenant name outside the root)."""
-    try:
-        name = normalize_domain(identity.strip().lower().removeprefix("*."))
-    except InvalidDomainError:
-        return None
-    return name if name == root or name.endswith("." + root) else None
+    name = try_normalize_domain(identity.strip().lower().removeprefix("*."))
+    return name if name and (name == root or name.endswith("." + root)) else None
 
 
 def _sans(root: str, row: dict[str, Any]) -> tuple[str, ...]:

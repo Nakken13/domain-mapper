@@ -23,6 +23,7 @@ import ipaddress
 import json
 import logging
 from collections.abc import Callable, Mapping
+from typing import TypeVar
 
 import httpx
 
@@ -100,7 +101,7 @@ class HttpClient:
             host = _host_of(url)
         except httpx.InvalidURL:
             raise FetchError(f"{source}: InvalidURL") from None
-        if _is_ip_literal(host) or self._is_forbidden_host(host):
+        if is_ip_literal(host) or self._is_forbidden_host(host):
             raise PassiveViolationError(f"{source}: refused to contact {host} directly")
 
         cache_key = json.dumps([query, url, sorted((params or {}).items())])
@@ -140,9 +141,23 @@ def _host_of(url: str) -> str:
     return httpx.URL(url).raw_host.decode("ascii").lower().removesuffix(".")
 
 
-def _is_ip_literal(host: str) -> bool:
+def is_ip_literal(host: str) -> bool:
     try:
         ipaddress.ip_address(host.strip("[]"))
     except ValueError:
         return False
     return True
+
+
+_T = TypeVar("_T")
+
+
+def parse_json(body: str, source: str, expect: type[_T]) -> _T:
+    """`body` decoded as JSON of type `expect`, or FetchError("<source>: unexpected payload")."""
+    try:
+        value = json.loads(body)
+    except json.JSONDecodeError:
+        value = None
+    if not isinstance(value, expect):
+        raise FetchError(f"{source}: unexpected payload")
+    return value

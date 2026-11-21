@@ -24,7 +24,6 @@ from __future__ import annotations
 import ipaddress
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime
 
 from surfacemap.models import (
     DnsRecord,
@@ -32,13 +31,12 @@ from surfacemap.models import (
     Entity,
     IPAddress,
     Observation,
-    Provenance,
     Relation,
     RelationType,
 )
 from surfacemap.plugins._resolver import DnsAnswer, DnsError, DnspythonResolver, Resolver
 from surfacemap.plugins.base import PluginBase, PluginContext
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.scope import try_normalize_domain
 
 RESOLVE_TYPES = ("A", "AAAA")
 ENRICH_TYPES = ("MX", "NS", "TXT")
@@ -46,13 +44,6 @@ _EDGE_TYPES = {"CNAME": RelationType.CNAME_TO, "MX": RelationType.MX, "NS": Rela
 NXDOMAIN = DnsRecord(type="RCODE", value="NXDOMAIN")
 
 logger = logging.getLogger(__name__)
-
-
-def _hostname(raw: str) -> str | None:
-    try:
-        return normalize_domain(raw)
-    except InvalidDomainError:
-        return None
 
 
 def _address(raw: str) -> str | None:
@@ -74,7 +65,7 @@ class _Collected:
     def add_answer(self, queried: str, answer: DnsAnswer) -> None:
         last = queried
         for record in answer.records:
-            owner = _hostname(record.owner)
+            owner = try_normalize_domain(record.owner)
             if owner is None:
                 continue
             if record.type in ("A", "AAAA"):
@@ -86,7 +77,7 @@ class _Collected:
             elif record.type in _EDGE_TYPES:
                 if record.type != "CNAME" and owner != queried:
                     continue  # MX/NS of a CNAME target: enrichment of another name
-                target = _hostname(record.value) if record.value else None
+                target = try_normalize_domain(record.value) if record.value else None
                 if target is not None and target != owner:
                     self.names.update((owner, target))
                     self.edges.add(
@@ -135,10 +126,9 @@ class DnsPlugin(PluginBase):
             if answer is not None:
                 collected.add_answer(name, answer)
         query = f"{name} {'/'.join(types)}"
-        if in_scope and (ctx.scope.root_of(name) == name or collected.has_mail_server(name)):
+        if in_scope and (ctx.scope.is_root(name) or collected.has_mail_server(name)):
             query += " +_dmarc"
-            is_root = ctx.scope.root_of(name) == name
-            collected.records[name].update(await self._dmarc(name, is_root, ctx))
+            collected.records[name].update(await self._dmarc(name, ctx.scope.is_root(name), ctx))
         if collected.empty():
             return []
         return [self._observation(name, query, collected, ctx)]
@@ -176,7 +166,7 @@ class DnsPlugin(PluginBase):
             for fqdn in names
         )
         return Observation(
-            provenance=Provenance(source=self.name, retrieved_at=datetime.now(UTC), query=query),
+            provenance=self.provenance(query),
             entities=(*domains, *(IPAddress(address=ip) for ip in sorted(collected.ips))),
             relations=tuple(
                 Relation(source=src, type=rel, target=dst)

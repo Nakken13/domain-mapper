@@ -42,6 +42,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
   - [x] crtsh: SECURED_BY edges only for in-scope hosts (same policy as wayback)
   - [x] `_resolver.DnspythonResolver`: build the dnspython resolver lazily (no OS config read at registry creation)
   - [x] geoip: `await asyncio.to_thread(_load, path)`; whois: `await writer.wait_closed()`; wayback: log when rows == CDX_LIMIT
-  - [ ] `simplify` pass (deep size): shared root-only applies_to, `_is_ip_literal` reuse from collect/http.py, one JSON-or-FetchError helper, `try_normalize`, shared NS observation (rdap/whois), `_COUNTRY`/`is_global` dupes, provenance helper
+  - [x] `simplify` pass (deep size): shared root-only applies_to, `_is_ip_literal` reuse from collect/http.py, one JSON-or-FetchError helper, `try_normalize`, shared NS observation (rdap/whois), `_COUNTRY`/`is_global` dupes, provenance helper
+  - Simplify skipped: gather over DNS types/ASNs (changes query order and third-party pacing); cached-lookup helper (two sites only)
   - Declined: Shodan hostnames as RESOLVES_TO (edge sources already distinguish Shodan); Shodan 404 noise (needs FetchError status in collect/http.py → follow-up)
 - [ ] Review + merge branch into main (main has uncommitted crew/ index edits from the hook: ask the user before committing/stashing them)

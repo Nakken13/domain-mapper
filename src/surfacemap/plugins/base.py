@@ -20,7 +20,7 @@ import contextlib
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Protocol, TypeVar, get_args, runtime_checkable
 
 import idna
@@ -30,8 +30,10 @@ from surfacemap.collect.http import HttpClient
 from surfacemap.collect.ratelimit import RateLimiter
 from surfacemap.config import Settings
 from surfacemap.models import (
+    Domain,
     Entity,
     Observation,
+    Provenance,
 )
 from surfacemap.scope import InvalidDomainError, Scope, normalize_domain
 
@@ -68,6 +70,10 @@ class ScopeView:
         """The authorized domain covering `fqdn`, or None when it is out of scope."""
         decision = self._scope.check(fqdn, today=self.today)
         return decision.entry.domain if decision.allowed and decision.entry else None
+
+    def is_root(self, fqdn: str) -> bool:
+        """True when `fqdn` is itself an authorized domain (not merely a name under one)."""
+        return self.root_of(fqdn) == fqdn
 
     def require(self, raw_domain: str) -> str:
         """Normalized domain, or OutOfScopeError, judged on the pinned date."""
@@ -152,6 +158,17 @@ class PluginBase:
 
     def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
         return True
+
+    def provenance(self, query: str) -> Provenance:
+        """Provenance of an observation this plugin makes now."""
+        return Provenance(source=self.name, retrieved_at=datetime.now(UTC), query=query)
+
+
+class RootOnlyPlugin(PluginBase):
+    """A plugin that only enriches the authorized domains themselves, never their subdomains."""
+
+    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
+        return isinstance(entity, Domain) and scope.is_root(entity.fqdn)
 
 
 def _validate(plugin: Plugin) -> None:

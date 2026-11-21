@@ -13,17 +13,15 @@ name servers are cached.
 from __future__ import annotations
 
 import asyncio
-import ipaddress
 import json
 import re
-from datetime import UTC, datetime
 from typing import Protocol
 
-from surfacemap.collect.http import PassiveViolationError
-from surfacemap.models import Domain, Entity, Observation, Provenance, Relation, RelationType
-from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
-from surfacemap.plugins.rdap import rdap_server
-from surfacemap.scope import InvalidDomainError, normalize_domain
+from surfacemap.collect.http import PassiveViolationError, is_ip_literal
+from surfacemap.models import Domain, Entity, Observation
+from surfacemap.plugins.base import PluginContext, RootOnlyPlugin
+from surfacemap.plugins.rdap import ns_observation, rdap_server
+from surfacemap.scope import try_normalize_domain
 
 IANA_WHOIS = "whois.iana.org"
 WHOIS_PORT = 43
@@ -65,27 +63,16 @@ class SocketTransport:
         return answer.decode("utf-8", "replace")
 
 
-def _is_ip_literal(host: str) -> bool:
-    try:
-        ipaddress.ip_address(host.strip("[]"))
-    except ValueError:
-        return False
-    return True
-
-
 def _name_servers(text: str, root: str) -> list[str]:
     servers: set[str] = set()
     for raw in _NAME_SERVER.findall(text):
-        try:
-            name = normalize_domain(raw)
-        except InvalidDomainError:
-            continue
-        if name != root:
+        name = try_normalize_domain(raw)
+        if name and name != root:
             servers.add(name)
     return sorted(servers)
 
 
-class WhoisPlugin(PluginBase):
+class WhoisPlugin(RootOnlyPlugin):
     name = "whois"
     consumes = frozenset({"domain"})
     runs_out_of_scope = False
@@ -93,11 +80,8 @@ class WhoisPlugin(PluginBase):
     def __init__(self, transport: WhoisTransport | None = None) -> None:
         self.transport: WhoisTransport = transport if transport is not None else SocketTransport()
 
-    def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
-        return isinstance(entity, Domain) and scope.root_of(entity.fqdn) == entity.fqdn
-
     async def _ask(self, server: str, text: str, ctx: PluginContext) -> str:
-        if _is_ip_literal(server) or ctx.scope.is_target_host(server):
+        if is_ip_literal(server) or ctx.scope.is_target_host(server):
             raise PassiveViolationError(f"{self.name}: refused to contact {server} directly")
         await ctx.limiter.acquire(self.name)
         return await self.transport.query(server, text)
@@ -132,14 +116,4 @@ class WhoisPlugin(PluginBase):
         servers = await self._servers_of(root, ctx)
         if not servers:
             return []
-        domain = Domain(fqdn=root, in_scope=ctx.scope.is_in_scope(root))
-        targets = [Domain(fqdn=ns, in_scope=ctx.scope.is_in_scope(ns)) for ns in servers]
-        return [
-            Observation(
-                provenance=Provenance(
-                    source=self.name, retrieved_at=datetime.now(UTC), query=f"whois {root}"
-                ),
-                entities=(domain, *targets),
-                relations=tuple(Relation.between(domain, RelationType.NS, ns) for ns in targets),
-            )
-        ]
+        return [ns_observation(self, root, servers, f"whois {root}", ctx)]

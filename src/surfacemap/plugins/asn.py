@@ -17,22 +17,19 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
-import re
-from datetime import UTC, datetime
 
 from surfacemap.models import (
     ASN,
     Entity,
     IPAddress,
     Observation,
-    Provenance,
     Relation,
     RelationType,
 )
 from surfacemap.plugins._resolver import DnsError, DnspythonResolver, Resolver
+from surfacemap.plugins._util import country_code, is_public_ip
 from surfacemap.plugins.base import PluginBase, PluginContext
 
-_COUNTRY = re.compile(r"^[A-Za-z]{2}$")
 _MAX_ASN = 2**32 - 1
 
 logger = logging.getLogger(__name__)
@@ -48,10 +45,6 @@ def origin_name(ip: IPAddress) -> str:
 
 def _fields(value: str) -> list[str]:
     return [field.strip() for field in value.split("|")]
-
-
-def _country(raw: str) -> str | None:
-    return raw if _COUNTRY.match(raw) else None
 
 
 class AsnPlugin(PluginBase):
@@ -86,11 +79,11 @@ class AsnPlugin(PluginBase):
         for value in await self._txt(f"AS{number}.asn.cymru.com", ctx) or []:
             fields = _fields(value)
             if len(fields) >= 5 and fields[4]:
-                return ASN(number=number, holder=fields[4], country=_country(fields[1]))
+                return ASN(number=number, holder=fields[4], country=country_code(fields[1]))
         return ASN(number=number)
 
     async def run(self, entity: Entity, ctx: PluginContext) -> list[Observation]:
-        if not isinstance(entity, IPAddress) or not ipaddress.ip_address(entity.address).is_global:
+        if not isinstance(entity, IPAddress) or not is_public_ip(entity.address):
             return []
         query = origin_name(entity)
         origins: set[int] = set()
@@ -104,9 +97,7 @@ class AsnPlugin(PluginBase):
         ip = IPAddress(address=entity.address)
         return [
             Observation(
-                provenance=Provenance(
-                    source=self.name, retrieved_at=datetime.now(UTC), query=f"{query} TXT"
-                ),
+                provenance=self.provenance(f"{query} TXT"),
                 entities=(ip, *asns),
                 relations=tuple(Relation.between(ip, RelationType.ANNOUNCED_BY, a) for a in asns),
             )
