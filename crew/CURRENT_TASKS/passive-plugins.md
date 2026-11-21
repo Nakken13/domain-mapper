@@ -14,7 +14,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 
 ## Actions
 
-- [ ] feat(plugins): crtsh
+- [x] feat(plugins): crtsh
 - [ ] feat(plugins): dns records (A/AAAA/CNAME/MX/TXT/NS); `_dmarc`/`_domainkey` built only here from a validated domain
 - [ ] feat(plugins): spf/dmarc parsing
 - [ ] feat(plugins): rdap (contacts dropped via privacy filters)

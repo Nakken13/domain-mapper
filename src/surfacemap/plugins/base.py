@@ -197,5 +197,10 @@ class PluginRegistry:
 
 
 def default_registry() -> PluginRegistry:
-    """A fresh registry with the built-in plugins (none yet: added by the plugins phase)."""
-    return PluginRegistry()
+    """A fresh registry with the built-in plugins."""
+    # Imported here: plugin modules import this one.
+    from surfacemap.plugins.crtsh import CrtshPlugin
+
+    registry = PluginRegistry()
+    registry.register(CrtshPlugin())
+    return registry
