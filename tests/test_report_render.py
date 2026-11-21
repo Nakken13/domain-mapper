@@ -67,3 +67,14 @@ def test_report_without_findings_says_so_instead_of_an_empty_table() -> None:
     html = _html()
     assert "No findings" in html
     assert "<table" not in html
+
+
+def test_every_node_kind_has_its_own_colour_in_the_graph_script() -> None:
+    """The palette is keyed by `kind_of` values; a missing key silently turns nodes grey."""
+    from surfacemap.graph._common import _BY_PREFIX
+
+    palette = re.search(r"var colors = \{(.*?)\};", _html(), re.DOTALL)
+    assert palette is not None
+    keys = set(re.findall(r"(\w+):\s*\"#", palette.group(1)))
+    kinds = {kind for kind, _label in _BY_PREFIX.values()}
+    assert kinds <= keys, f"no colour for: {sorted(kinds - keys)}"

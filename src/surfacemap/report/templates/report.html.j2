@@ -61,7 +61,7 @@ th, td { text-align: left; vertical-align: top; padding: .5rem .75rem; border-bo
 <script>
 (function () {
   var data = JSON.parse(document.getElementById("graph-data").textContent);
-  var colors = { domain: "#2f81f7", ip: "#3fb950", asn: "#a371f7", cert: "#d29922", tech: "#db61a2", url: "#8b949e" };
+  var colors = { domain: "#2f81f7", ip: "#3fb950", asn: "#a371f7", certificate: "#d29922", technology: "#db61a2", archived_url: "#8b949e" };
   var elements = [];
   data.nodes.forEach(function (n) { elements.push({ data: n }); });
   data.edges.forEach(function (e, i) {
