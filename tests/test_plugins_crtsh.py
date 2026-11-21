@@ -119,7 +119,8 @@ async def test_cached_body_keeps_only_hostname_identities_and_no_issuer_email(
         [
             {
                 "common_name": "Jane Doe",
-                "name_value": "Jane Doe\nwww.example.com",
+                # `jane.doe` is hostname-shaped: only names under the root may be cached.
+                "name_value": "Jane Doe\njane.doe\nother.net\nwww.example.com",
                 "issuer_name": "C=US, O=Acme, emailAddress=pki@acme.test",
             }
         ]
@@ -129,6 +130,8 @@ async def test_cached_body_keeps_only_hostname_identities_and_no_issuer_email(
 
     [(body,)] = plugin_ctx.cache._db.execute("SELECT body FROM responses").fetchall()
     assert "Jane" not in body
+    assert "jane.doe" not in body
+    assert "other.net" not in body
     assert "pki@acme.test" not in body
     assert "www.example.com" in body
 

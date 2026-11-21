@@ -27,6 +27,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from functools import partial
 from typing import Any
 
 from surfacemap.collect.http import FetchError
@@ -87,7 +88,7 @@ class CrtshPlugin(PluginBase):
             CRTSH_URL,
             query=query,
             params={"q": query, "output": "json"},
-            redact=_minimize,
+            redact=partial(_minimize, root),
         )
         rows = [row for row in _rows(body) if isinstance(row, dict)]
         names = sorted({_host(san) for row in rows for san in _sans(root, row)})
@@ -159,13 +160,15 @@ def _rows(body: str) -> list[Any]:
     return rows
 
 
-def _minimize(body: str) -> str:
+def _minimize(root: str, body: str) -> str:
     """The crt.sh payload reduced to the fields used here, personal data removed.
 
     Runs before the response cache: S/MIME certificates list personal emails and person
     names (as CN), and the raw body must never reach disk. Only identity lines that are
-    hostnames are kept (structural, not a regex over the JSON text, so the name following
-    a dropped line in a multi-line `name_value` survives); the issuer DN is email-scrubbed.
+    hostnames under `root` are kept (a person's name can be hostname-shaped, so a
+    hostname check alone is not enough; structural, not a regex over the JSON text, so
+    the name following a dropped line in a multi-line `name_value` survives); the issuer
+    DN is email-scrubbed.
     """
     kept: list[dict[str, Any]] = []
     for row in _rows(body):
@@ -175,7 +178,7 @@ def _minimize(body: str) -> str:
         for key in _IDENTITY_FIELDS:
             value = fields.get(key)
             if isinstance(value, str):
-                fields[key] = "\n".join(x for x in value.splitlines() if _hostname(x))
+                fields[key] = "\n".join(x for x in value.splitlines() if _hostname(root, x))
         issuer = fields.get("issuer_name")
         if isinstance(issuer, str):
             fields["issuer_name"] = scrub_emails(issuer)
@@ -198,12 +201,14 @@ def _fingerprint(pem: str) -> str:
     return hashlib.sha256(der).hexdigest()
 
 
-def _hostname(identity: str) -> str | None:
-    """The normalized hostname an identity line names (`*.` stripped), None if it is not one."""
+def _hostname(root: str, identity: str) -> str | None:
+    """The normalized hostname an identity line names (`*.` stripped) when it is `root` or
+    below it, None otherwise (not a hostname, or a co-tenant name outside the root)."""
     try:
-        return normalize_domain(identity.strip().lower().removeprefix("*."))
+        name = normalize_domain(identity.strip().lower().removeprefix("*."))
     except InvalidDomainError:
         return None
+    return name if name == root or name.endswith("." + root) else None
 
 
 def _sans(root: str, row: dict[str, Any]) -> tuple[str, ...]:
@@ -214,13 +219,8 @@ def _sans(root: str, row: dict[str, Any]) -> tuple[str, ...]:
         if not isinstance(value, str):
             continue
         for identity in value.splitlines():
-            name = _hostname(identity)
-            if name is None:
-                logger.debug("crtsh: skipped an identity that is not a hostname")
-                continue
-            wildcard = identity.strip().startswith("*.")
-            if name == root or name.endswith("." + root):
-                sans.add(f"*.{name}" if wildcard else name)
+            if (name := _hostname(root, identity)) is not None:
+                sans.add(f"*.{name}" if identity.strip().startswith("*.") else name)
     return tuple(sorted(sans))
 
 
