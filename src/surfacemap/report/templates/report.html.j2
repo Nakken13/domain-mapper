@@ -11,12 +11,16 @@ body { margin: 0; padding: 16px; font: 16px/1.5 system-ui, sans-serif; color: va
 main { max-width: 72rem; margin: 0 auto; }
 h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
 .meta { color: var(--muted); margin: 0 0 1.5rem; }
+#cy { width: 100%; height: 60vh; min-height: 320px; border: 1px solid var(--line); border-radius: 6px; }
+.legend { color: var(--muted); font-size: .875rem; margin: .5rem 0 1.5rem; }
 </style>
 </head>
 <body>
 <main>
 <h1>Attack surface of {{ domain }}</h1>
 <p class="meta">{{ node_count }} nodes, {{ edge_count }} relations, {{ findings|length }} findings. Passive sources only.</p>
+<div id="cy" role="img" aria-label="Graph of {{ node_count }} nodes and {{ edge_count }} relations for {{ domain }}"></div>
+<p class="legend">Solid outline: in scope. Dashed outline: seen in passive data but outside the authorized scope.</p>
 {% for finding in findings %}
 <section>
 <h2>{{ finding.title }}</h2>
@@ -24,5 +28,39 @@ h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
 </section>
 {% endfor %}
 </main>
+<script type="application/json" id="graph-data">{{ graph_json|safe }}</script>
+<script>
+/* Cytoscape.js 3.33.1, inlined, no network access. Licence:
+
+{{ cytoscape_licence|safe }}
+*/
+{{ cytoscape_js|safe }}
+</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById("graph-data").textContent);
+  var colors = { domain: "#2f81f7", ip: "#3fb950", asn: "#a371f7", cert: "#d29922", tech: "#db61a2", url: "#8b949e" };
+  var elements = [];
+  data.nodes.forEach(function (n) { elements.push({ data: n }); });
+  data.edges.forEach(function (e, i) {
+    elements.push({ data: { id: "e" + i, source: e.source, target: e.target, type: e.type } });
+  });
+  cytoscape({
+    container: document.getElementById("cy"),
+    elements: elements,
+    layout: { name: "cose", animate: false },
+    style: [
+      { selector: "node", style: {
+        "label": "data(label)", "font-size": 10, "color": "#8b949e", "text-valign": "bottom", "text-margin-y": 4,
+        "background-color": function (n) { return colors[n.data("kind")] || "#8b949e"; },
+        "border-width": 2, "border-color": "#0d1117" } },
+      { selector: "node[?in_scope]", style: { "border-style": "solid" } },
+      { selector: "node[!in_scope]", style: { "border-style": "dashed", "border-color": "#f85149" } },
+      { selector: "edge", style: { "width": 1, "line-color": "#8b949e", "target-arrow-color": "#8b949e",
+        "target-arrow-shape": "triangle", "curve-style": "bezier" } }
+    ]
+  });
+})();
+</script>
 </body>
 </html>
