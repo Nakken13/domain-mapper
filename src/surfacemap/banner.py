@@ -43,7 +43,8 @@ def _centered(lines: tuple[str, ...], columns: int) -> list[str]:
 def banner() -> str:
     """Art, title, then version and tagline, centered (no padding if the terminal is too narrow)."""
     columns = shutil.get_terminal_size((80, 24)).columns
-    lines = _centered(_ART, columns) + _centered(_TITLE, columns)
+    art_fits = columns >= max(len(line) for line in _ART)  # wrapped braille is unreadable
+    lines = (_centered(_ART, columns) if art_fits else []) + _centered(_TITLE, columns)
     lines += ["", f"v{__version__}".center(columns).rstrip()]
     lines.append("Passive attack-surface mapper".center(columns).rstrip())
     return "\n".join(lines) + "\n"

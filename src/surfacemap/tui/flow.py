@@ -31,11 +31,17 @@ _ABOUT = (
 
 
 def _exit_code(command: Callable[..., None], *args: object) -> int:
-    """Runs a CLI command; the `typer.Exit` it raises becomes its exit code."""
+    """Runs a CLI command; the `typer.Exit` it raises becomes its exit code.
+
+    Any other failure (network, disk, plugin bug) is reported and returns 2 instead of killing the
+    menu; Ctrl-C is not an `Exception`, so it still propagates."""
     try:
         command(*args)
     except typer.Exit as stop:
         return stop.exit_code
+    except Exception as exc:
+        typer.secho(f"ERROR {type(exc).__name__}: {exc}", fg=typer.colors.RED, err=True)
+        return 2
     return 0
 
 
@@ -66,8 +72,10 @@ def _open_report(last_report: Path | None, print_fn: PrintFn, open_fn: OpenFn) -
     elif not last_report.is_file():
         print_fn(f"Report not found: {last_report}")
     else:
-        open_fn(last_report.resolve().as_uri())
-        print_fn(f"Opened {last_report} in the browser.")
+        if open_fn(last_report.resolve().as_uri()):
+            print_fn(f"Opened {last_report} in the browser.")
+        else:
+            print_fn(f"Could not open a browser: open {last_report.resolve()} by hand.")
 
 
 def run(

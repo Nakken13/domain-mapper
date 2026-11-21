@@ -32,7 +32,7 @@ def choose(
             on_info()
             print_fn("\n" + render_menu(title, options, back=back, info=True, color=color))
             continue
-        if entry.isdigit() and 1 <= int(entry) <= len(options):
+        if entry.isascii() and entry.isdigit() and 1 <= int(entry) <= len(options):
             return int(entry) - 1
         print_fn(f"Invalid choice: enter a number between 1 and {len(options)}, or q.")
 

@@ -69,3 +69,10 @@ def test_ask_required_repeats_until_a_value_is_given():
 def test_ask_optional_returns_empty_on_enter():
     _, print_fn = _printer()
     assert prompts.ask("Output", input_fn=_inputs(""), print_fn=print_fn) == ""
+
+
+def test_choose_rejects_non_ascii_digits_without_crashing():
+    out, print_fn = _printer()
+    index = prompts.choose("T", ["a"], input_fn=_inputs("\u00b2", "\u0663", "1"), print_fn=print_fn)
+    assert index == 0
+    assert sum("Invalid choice" in line for line in out) == 2

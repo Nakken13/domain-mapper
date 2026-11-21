@@ -45,3 +45,10 @@ def test_banner_is_centered_and_fits_wide_terminal(terminal):
 def test_banner_never_crashes_on_narrow_terminal(terminal):
     terminal(20)
     assert f"v{__version__}" in banner()  # centering degrades to no padding
+
+
+def test_banner_skips_the_braille_art_when_the_terminal_is_too_narrow(terminal):
+    terminal(40)
+    text = banner()
+    assert "⣿" not in text  # wrapped braille would be garbled
+    assert f"v{__version__}" in text

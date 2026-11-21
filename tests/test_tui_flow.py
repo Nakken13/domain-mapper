@@ -30,11 +30,15 @@ class Session:
         self.scans.append((domain, scope_file, output))
         return self._scan_code
 
+    def _open(self, uri: str) -> bool:
+        self.opened.append(uri)
+        return True
+
     def run(self) -> str:
         flow.run(
             input_fn=lambda _prompt: next(self._feed),
             print_fn=self.out.append,
-            open_fn=self.opened.append,
+            open_fn=self._open,
             scope_file=SCOPE,
             scope_check_fn=self._check,
             scan_fn=self._scan,
@@ -137,3 +141,20 @@ def test_default_scan_refuses_out_of_scope_before_any_collection(
 
 def test_default_scan_reports_a_missing_scope_file(tmp_path: Path):
     assert flow.default_scan("example.com", tmp_path / "nope.yaml", None) == 2
+
+
+def test_default_scan_survives_an_unexpected_error(scope_file: Path, monkeypatch, capsys):
+    def explode(*_args, **_kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("surfacemap.cli.scan", explode)
+    assert flow.default_scan("example.com", scope_file, None) == 2
+    assert "disk full" in capsys.readouterr().err
+
+
+def test_open_report_warns_when_no_browser_could_open_it(tmp_path: Path):
+    report = tmp_path / "r.html"
+    report.write_text("<html></html>", encoding="utf-8")
+    out: list[str] = []
+    flow._open_report(report, out.append, lambda _uri: False)
+    assert any("Could not open" in line for line in out)
