@@ -12,8 +12,8 @@ Traffic: none.
 from __future__ import annotations
 
 import sys
-from hashlib import sha256
 from datetime import UTC, date, datetime
+from hashlib import sha256
 from pathlib import Path
 
 from surfacemap.cli import _default_rules
