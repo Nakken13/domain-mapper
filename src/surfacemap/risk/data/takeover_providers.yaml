@@ -1,0 +1,31 @@
+# Providers where an abandoned CNAME target can be claimed by a third party.
+# A name is only reported when its CNAME target ends with one of `suffixes` AND the target
+# answers NXDOMAIN (passive check, no HTTP fingerprint). Suffixes match on a label boundary.
+providers:
+  - name: GitHub Pages
+    suffixes: [github.io]
+  - name: Heroku
+    suffixes: [herokuapp.com, herokudns.com]
+  - name: Amazon S3 website
+    suffixes: [s3.amazonaws.com, s3-website.amazonaws.com]
+  - name: Amazon Elastic Beanstalk
+    suffixes: [elasticbeanstalk.com]
+  - name: Microsoft Azure
+    suffixes:
+      [azurewebsites.net, cloudapp.net, cloudapp.azure.com, trafficmanager.net, blob.core.windows.net]
+  - name: Fastly
+    suffixes: [fastly.net]
+  - name: Netlify
+    suffixes: [netlify.app, netlify.com]
+  - name: Shopify
+    suffixes: [myshopify.com]
+  - name: Zendesk
+    suffixes: [zendesk.com]
+  - name: Surge.sh
+    suffixes: [surge.sh]
+  - name: Pantheon
+    suffixes: [pantheonsite.io]
+  - name: Ghost
+    suffixes: [ghost.io]
+  - name: Readme.io
+    suffixes: [readme.io]
