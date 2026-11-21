@@ -186,3 +186,8 @@ def test_target_host_matches_every_idna_spelling(host: str) -> None:
     # IDNA 2003 (Python codec, used by scope) maps ß to ss; IDNA 2008 (httpx) keeps it.
     view = ScopeView(Scope([ScopeEntry(domain="straße.example", authorization="x")]), TODAY)
     assert view.is_target_host(host)
+
+
+def test_engine_source_name_is_reserved() -> None:
+    with pytest.raises(ValueError, match="reserved"):
+        PluginRegistry().register(make("surfacemap"))

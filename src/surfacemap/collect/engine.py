@@ -47,12 +47,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum
 
+from surfacemap.collect.http import PassiveViolationError
 from surfacemap.graph.builder import SurfaceGraph
 from surfacemap.models import Domain, Entity, Observation, Provenance, Relation, RelationType
-from surfacemap.plugins.base import Plugin, PluginContext
+from surfacemap.plugins.base import ENGINE_SOURCE, Plugin, PluginContext, ScopeView
 from surfacemap.privacy import redact_observation
-
-ENGINE_SOURCE = "surfacemap"
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +143,19 @@ class Engine:
                     entity.kind in plugin.consumes
                     and (plugin.name, entity_id) not in done
                     and (reach[entity_id] is Reach.FULL or plugin.runs_out_of_scope)
-                    and plugin.applies_to(entity, self._ctx.scope)
+                    and self._applies(plugin, entity)
                 ):
                     items.append((plugin, entity))
         return items
+
+    def _applies(self, plugin: Plugin, entity: Entity) -> bool:
+        try:
+            return plugin.applies_to(entity, self._ctx.scope)
+        except Exception as exc:  # a filter bug skips the call, not the run
+            logger.warning(
+                "plugin %s applies_to failed on %s: %s", plugin.name, entity.id, type(exc).__name__
+            )
+            return False
 
     async def _call(
         self, semaphore: asyncio.Semaphore, plugin: Plugin, entity: Entity
@@ -157,8 +165,10 @@ class Engine:
                 async with asyncio.timeout(self._limits.plugin_timeout):
                     return list(await plugin.run(entity, self._ctx))
             except Exception as exc:  # isolate any plugin bug; cancellation still propagates
-                logger.warning(
-                    "plugin %s failed on %s: %s", plugin.name, entity.id, type(exc).__name__
+                # A plugin aiming at the target breaks the passive contract: louder than a bug.
+                level = logging.ERROR if isinstance(exc, PassiveViolationError) else logging.WARNING
+                logger.log(
+                    level, "plugin %s failed on %s: %s", plugin.name, entity.id, type(exc).__name__
                 )
                 return []
 
@@ -191,7 +201,8 @@ class Engine:
         )
         graph.merge(clean)
 
-        levels = _levels_in(clean, reach, reach[subject.id])
+        scope = self._ctx.scope
+        levels = _levels_in(clean, reach, reach[subject.id], scope)
         cname_targets = {r.target for r in clean.relations if r.type is RelationType.CNAME_TO}
         expand = set()
         for entity in clean.entities:
@@ -201,7 +212,8 @@ class Engine:
             # scope authorizes are always expanded. The rest is recorded, not crawled.
             may_expand = (
                 level is Reach.FULL
-                or _parent_level(entity.id, clean, levels, reach, reach[subject.id]) is Reach.FULL
+                or _parent_level(entity.id, clean, levels, reach, reach[subject.id], scope)
+                is Reach.FULL
                 or entity.id in cname_targets
             )
             # Tracked apart from reach: a node first recorded without expansion must still
@@ -245,18 +257,34 @@ def _parent_level(
     levels: dict[str, Reach],
     reach: dict[str, Reach],
     fallback: Reach,
+    scope: ScopeView,
 ) -> Reach:
-    """Highest reach among the nodes pointing at `entity_id` in this observation."""
-    known = [
-        level
-        for r in observation.relations
-        if r.target == entity_id and (level := levels.get(r.source) or reach.get(r.source))
-    ]
-    return max(known) if known else fallback
+    """Highest reach among the nodes pointing at `entity_id` in this observation.
+
+    `fallback` (the queried subject) applies only when nothing points at the entity. A
+    parent known only as a relation endpoint is judged fail-closed: by the scope for a
+    domain id, RESOLVE_ONLY otherwise.
+    """
+    parents = [r.source for r in observation.relations if r.target == entity_id]
+    if not parents:
+        return fallback
+    return max(_known_level(parent, levels, reach, scope) for parent in parents)
+
+
+def _known_level(
+    entity_id: str, levels: dict[str, Reach], reach: dict[str, Reach], scope: ScopeView
+) -> Reach:
+    level = levels.get(entity_id) or reach.get(entity_id)
+    if level is not None:
+        return level
+    kind, _, value = entity_id.partition(":")
+    if kind == "domain" and scope.is_in_scope(value):
+        return Reach.FULL
+    return Reach.RESOLVE_ONLY
 
 
 def _levels_in(
-    observation: Observation, reach: dict[str, Reach], subject_reach: Reach
+    observation: Observation, reach: dict[str, Reach], subject_reach: Reach, scope: ScopeView
 ) -> dict[str, Reach]:
     """Reach of each entity as stated by this observation (review I2).
 
@@ -273,7 +301,7 @@ def _levels_in(
     for _ in range(len(others) + 1):  # chains (domain -> ip -> asn) settle in a few passes
         changed = False
         for entity_id in others:
-            level = _parent_level(entity_id, observation, levels, reach, subject_reach)
+            level = _parent_level(entity_id, observation, levels, reach, subject_reach, scope)
             if levels.get(entity_id) != level:
                 levels[entity_id] = level
                 changed = True

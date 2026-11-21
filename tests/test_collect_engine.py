@@ -453,3 +453,75 @@ async def test_reach_follows_relations_inside_a_multi_hop_answer(ctx: PluginCont
     await Engine([dns, asn, tech], ctx).run("example.com")
     assert IP_CDN.id not in asn.calls
     assert asn_entity.id not in tech.calls  # two hops away from the CDN name: still limited
+
+
+async def test_unknown_parent_does_not_lend_the_subject_reach(ctx: PluginContext) -> None:
+    # Security review: the CDN name only appears as a relation endpoint. Its IP must not
+    # fall back to the in-scope reach of the queried name.
+    dns = Fake(
+        "dns",
+        {"domain"},
+        table(
+            "dns",
+            {
+                "domain:example.com": [API],
+                API.id: [IP_CDN, Relation.between(CDN, RelationType.RESOLVES_TO, IP_CDN)],
+            },
+        ),
+        runs_out_of_scope=True,
+    )
+    asn = Fake("asn", {"ip"}, lambda ip: [])
+    await Engine([dns, asn], ctx).run("example.com")
+    assert IP_CDN.id not in asn.calls
+
+
+async def test_in_scope_parent_known_only_as_endpoint_keeps_full_reach(
+    ctx: PluginContext,
+) -> None:
+    other = dom("other.example.com")
+    dns = Fake(
+        "dns",
+        {"domain"},
+        table(
+            "dns",
+            {
+                "domain:example.com": [
+                    IP_WWW,
+                    Relation.between(other, RelationType.RESOLVES_TO, IP_WWW),
+                ]
+            },
+        ),
+        runs_out_of_scope=True,
+    )
+    asn = Fake("asn", {"ip"}, lambda ip: [])
+    await Engine([dns, asn], ctx).run("example.com")
+    assert asn.calls == [IP_WWW.id]
+
+
+async def test_crash_in_applies_to_is_isolated(
+    ctx: PluginContext, caplog: pytest.LogCaptureFixture
+) -> None:
+    class Picky(Fake):
+        def applies_to(self, entity: Entity, scope: ScopeView) -> bool:
+            raise ValueError("bug")
+
+    picky = Picky("picky", {"domain"}, lambda e: [])
+    subs, _, _ = scenario()
+    graph = await Engine([picky, subs], ctx).run("example.com")
+    assert WWW.id in graph.nodes
+    assert picky.calls == []
+    assert "picky" in caplog.text
+
+
+async def test_passive_violation_is_logged_as_an_error(
+    ctx: PluginContext, caplog: pytest.LogCaptureFixture
+) -> None:
+    from surfacemap.collect.http import PassiveViolationError
+
+    def contact_target(entity: Entity) -> list[Observation]:
+        raise PassiveViolationError("refused")
+
+    rogue = Fake("rogue", {"domain"}, contact_target)
+    await Engine([rogue], ctx).run("example.com")
+    (record,) = [r for r in caplog.records if "rogue" in r.getMessage()]
+    assert record.levelno == logging.ERROR

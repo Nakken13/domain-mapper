@@ -46,6 +46,8 @@ ENTITY_KINDS = frozenset(
     for model in (Domain, IPAddress, ASN, Certificate, Technology, ArchivedURL)
 )
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+ENGINE_SOURCE = "surfacemap"
+"""Provenance source of the engine's own (structural) observations: no plugin may use it."""
 
 
 class ScopeView:
@@ -153,6 +155,8 @@ def _validate(plugin: Plugin) -> None:
         raise TypeError(f"{plugin!r} does not implement the Plugin protocol")
     if not _NAME.match(plugin.name):
         raise ValueError(f"plugin name {plugin.name!r} must be a lowercase slug")
+    if plugin.name == ENGINE_SOURCE:
+        raise ValueError(f"plugin name {ENGINE_SOURCE!r} is reserved for the engine")
     if not plugin.consumes or not plugin.consumes <= ENTITY_KINDS:
         raise ValueError(
             f"{plugin.name}: consumes must be a non-empty subset of {sorted(ENTITY_KINDS)}"
