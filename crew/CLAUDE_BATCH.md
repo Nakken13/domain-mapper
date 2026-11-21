@@ -5,18 +5,6 @@ One batch = one Claude. See § Batching in `crew/CLAUDE_CONTEXT/LIFECYCLE.md` fo
 
 ## Unsorted
 
-## Batch B
-
-Zone: `src/surfacemap/collect/`, `src/surfacemap/plugins/base.py`, `tests/`
-
-- ~~`collection-engine.md`~~
-
-## Batch C
-
-Zone: `src/surfacemap/plugins/`, `tests/fixtures/`, `tests/`
-
-- ~~`passive-plugins.md`~~
-
 ## Batch D
 
 Zone: `src/surfacemap/risk/`, `tests/`
