@@ -3,7 +3,8 @@
 Traffic: HTTPS GETs to `crt.sh` (a third-party CT log search run by Sectigo), never to
 the target or its subdomains: one search per scope root (`q=%.<root>`), then one
 download (`d=<id>`) per certificate valid on the run date, newest first, at most
-`MAX_CERTIFICATES`. Both go through the shared HTTP client (rate limit, cache).
+`MAX_CERTIFICATES`, within `DOWNLOAD_BUDGET` seconds. Both go through the shared HTTP
+client (rate limit, cache).
 
 Only names under the queried root are kept: a certificate may also list unrelated
 co-tenant names, which are not part of the assessed surface. Email identities (S/MIME
@@ -18,6 +19,7 @@ it: rules built on these certificates must word their findings accordingly.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -43,6 +45,9 @@ from surfacemap.scope import InvalidDomainError, normalize_domain
 CRTSH_URL = "https://crt.sh/"
 MAX_CERTIFICATES = 50
 """Downloads per root: crt.sh is a free, often overloaded service."""
+DOWNLOAD_BUDGET = 60.0
+"""Seconds for all downloads of one root, well under the engine's per-call timeout: a
+timeout there would discard the whole call, subdomains included."""
 
 _IDENTITY_FIELDS = ("common_name", "name_value")
 _KEPT_FIELDS = frozenset({"id", "issuer_name", "not_before", "not_after", *_IDENTITY_FIELDS})
@@ -93,10 +98,14 @@ class CrtshPlugin(PluginBase):
                 ),
             )
         ]
-        for candidate in _valid_certificates(root, rows, ctx.scope.today):
-            certificate = await self._download(candidate, ctx)
-            if certificate is not None:
-                observations.append(certificate)
+        try:
+            async with asyncio.timeout(DOWNLOAD_BUDGET):
+                for candidate in _valid_certificates(root, rows, ctx.scope.today):
+                    certificate = await self._download(candidate, ctx)
+                    if certificate is not None:
+                        observations.append(certificate)
+        except TimeoutError:
+            logger.warning("crtsh: certificate downloads cut after %ss", DOWNLOAD_BUDGET)
         return observations
 
     async def _download(self, candidate: _Candidate, ctx: PluginContext) -> Observation | None:

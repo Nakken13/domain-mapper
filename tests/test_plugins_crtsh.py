@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -217,3 +218,28 @@ async def test_a_bad_certificate_download_is_skipped(plugin_ctx: PluginContext) 
     [domains] = await CrtshPlugin().run(ROOT, plugin_ctx)
 
     assert len(domains.entities) == 3
+
+
+@respx.mock
+async def test_downloads_stop_at_their_time_budget_and_keep_results(
+    plugin_ctx: PluginContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(crtsh, "DOWNLOAD_BUDGET", 0.2)
+    mock_crtsh(
+        [
+            row(1, "2026-05-02T00:00:00", "2026-08-01T00:00:00"),
+            row(2, "2026-05-01T00:00:00", "2026-08-01T00:00:00"),
+        ]
+    )
+    mock_pem(1, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n")
+
+    async def slow(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(5)
+        return httpx.Response(200, text="never")
+
+    respx.get(CRTSH_URL, params={"d": "2"}).mock(side_effect=slow)
+
+    domains, cert = await CrtshPlugin().run(ROOT, plugin_ctx)
+
+    assert len(domains.entities) == 2  # the subdomains survive the cut
+    assert cert.provenance.query == "crt.sh id 1"
