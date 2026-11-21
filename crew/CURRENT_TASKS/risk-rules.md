@@ -16,5 +16,5 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
 - [x] feat(risk): missing/weak DMARC and SPF rule
 - [x] feat(risk): expired / soon-expiring certificates rule
 - [x] feat(risk): exposed dev/staging/test subdomains rule
-- [ ] feat(risk): multiple hosting providers rule
+- [x] feat(risk): multiple hosting providers rule
 - [ ] Review + merge branch into main
