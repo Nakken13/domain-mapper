@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from datetime import UTC, datetime
 from functools import partial
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from surfacemap.collect.http import FetchError
 from surfacemap.models import (
@@ -31,7 +32,7 @@ from surfacemap.models import (
     RelationType,
 )
 from surfacemap.plugins.base import PluginBase, PluginContext, ScopeView
-from surfacemap.privacy import scrub_emails, strip_query
+from surfacemap.privacy import REDACTED_EMAIL, scrub_emails, strip_query
 from surfacemap.scope import InvalidDomainError, normalize_domain
 
 CDX_URL = "https://web.archive.org/cdx/search/cdx"
@@ -141,7 +142,33 @@ def _location(root: str, original: str) -> tuple[str, str] | None:
     if host != root and not host.endswith("." + root):
         return None
     # Emails in a path (`/unsubscribe/jane@…`) are scrubbed here, before the cache.
-    return host, scrub_emails(_PATH_CUT.split(parts.path, maxsplit=1)[0]) or "/"
+    path = _PATH_CUT.split(_redact_email_segments(parts.path), maxsplit=1)[0]
+    return host, scrub_emails(path) or "/"
+
+
+_MAX_DECODE_ROUNDS = 4
+
+
+def _redact_email_segments(path: str) -> str:
+    """Path with every segment that decodes to an email replaced by a placeholder.
+
+    Obfuscated emails (`%6A%61ne%40…`, double-encoded `%2540`, fullwidth at-sign) dodge a
+    plain scrubber and the `%25` cut would leave their local part behind. Each segment is
+    decoded (repeated `unquote`, NFKC) until stable; one holding an `@` is dropped whole,
+    and so is one that never settles (fail closed).
+    """
+    return "/".join(
+        REDACTED_EMAIL if "@" in _decode(segment) else segment for segment in path.split("/")
+    )
+
+
+def _decode(segment: str) -> str:
+    for _ in range(_MAX_DECODE_ROUNDS):
+        decoded = unicodedata.normalize("NFKC", unquote(segment))
+        if decoded == segment:
+            return decoded
+        segment = decoded
+    return "@"  # still changing after several rounds: treat as hostile
 
 
 def _spans(root: str, rows: list[Any]) -> dict[tuple[str, str], _Span]:

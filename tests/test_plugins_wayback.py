@@ -179,3 +179,27 @@ async def test_emails_in_paths_never_reach_the_cache(plugin_ctx: PluginContext) 
         assert "jane.doe" not in body
         assert "john.roe" not in body
     assert "jane.doe" not in observation.model_dump_json()
+
+
+@respx.mock
+async def test_obfuscated_emails_in_paths_never_reach_the_cache(plugin_ctx: PluginContext) -> None:
+    # Fully percent-encoded, double-encoded and fullwidth at-sign: all decode to an email
+    # that the plain scrubber does not see.
+    mock_cdx(
+        [
+            ["timestamp", "original"],
+            ["20200101000000", "https://example.com/u/%6A%61ne%2Edoe%40example.org"],
+            ["20200101000000", "https://example.com/u/mary.sue%2540example.org"],
+            ["20200101000000", "https://example.com/u/john.roe\uff20example.org/profile"],
+            ["20200101000000", "https://example.com/n/ann.lee%252525252540example.org"],
+            ["20200101000000", "https://example.com/docs/a%20b"],
+        ]
+    )
+    [observation] = await WaybackPlugin().run(ROOT, plugin_ctx)
+    leaked = ("jane", "doe", "%6A", "mary.sue", "john.roe", "ann.lee", "example.org", "\uff20")
+    cached = [body for (body,) in plugin_ctx.cache._db.execute("SELECT body FROM responses")]
+    emitted = observation.model_dump_json()
+    for text in (*cached, emitted):
+        for needle in leaked:
+            assert needle not in text
+    assert "/docs/a%20b" in cached[0]  # a harmless encoded path is untouched

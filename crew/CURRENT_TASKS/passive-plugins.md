@@ -38,7 +38,7 @@ Rules: Conventional Commits, one atomic commit per action below, TDD (test first
   - [x] crtsh `_minimize`: keep only identity lines that normalize as hostnames (S/MIME CN = person name reaches cache); `scrub_emails` on `issuer_name`
   - [ ] crtsh: download deadline from call start (`asyncio.timeout_at(start + DOWNLOAD_BUDGET)`), a slow search must not lose subdomains
   - [ ] dns/mailauth: DMARC empty "absent" only on scope roots (RFC 7489 § 6.6.3 fallback to org domain); multiple `v=DMARC1` → `dmarc_of` returns "invalid"
-  - [ ] wayback: emails encoded in a path (e.g. `%6A%61ne%40…`, fullwidth `＠`) dodge `scrub_emails`: NFKC + repeated `unquote` before scrubbing, or fail closed (cut the path at any remaining `%`) (background security review)
+  - [x] wayback: emails encoded in a path (e.g. `%6A%61ne%40…`, fullwidth `＠`) dodge `scrub_emails`: NFKC + repeated `unquote` before scrubbing, or fail closed (cut the path at any remaining `%`) (background security review)
   - [x] crtsh: SECURED_BY edges only for in-scope hosts (same policy as wayback)
   - [ ] `_resolver.DnspythonResolver`: build the dnspython resolver lazily (no OS config read at registry creation)
   - [ ] geoip: `await asyncio.to_thread(_load, path)`; whois: `await writer.wait_closed()`; wayback: log when rows == CDX_LIMIT
