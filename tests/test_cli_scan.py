@@ -113,3 +113,16 @@ def test_scan_reports_findings_from_the_risk_rules(
     result = runner.invoke(cli.app, ["scan", "example.com", "-s", str(scope_file), "-o", str(out)])
     assert result.exit_code == 0, result.output
     assert "Non-production name resolves publicly" in out.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("bad", ["missing-dir/out.html", "."])
+def test_scan_rejects_an_unwritable_output_before_collecting(
+    scope_file: Path, tmp_path: Path, bad: str
+) -> None:
+    """A bad -o must fail fast: not after a full collection whose results would be lost."""
+    result = runner.invoke(
+        cli.app, ["scan", "example.com", "-s", str(scope_file), "-o", str(tmp_path / bad)]
+    )
+    assert result.exit_code == 2
+    assert "output" in result.output.lower()
+    assert calls == []  # no plugin ran

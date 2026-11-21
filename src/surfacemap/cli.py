@@ -132,11 +132,20 @@ def scan(
         typer.secho(f"REFUSED {exc}", fg=typer.colors.RED)
         raise typer.Exit(code=1) from exc
 
+    target = output or Path(f"{root}-report.html")
+    # Fail before the (slow, rate-limited) collection: its results would be lost otherwise.
+    if target.is_dir() or not target.resolve().parent.is_dir():
+        typer.secho(
+            f"ERROR output path {target} is a directory or its folder does not exist",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
     graph = asyncio.run(_collect(root, scope, Settings(), today))
     findings: tuple[Finding, ...] = run_rules(
         RuleContext(graph=graph, today=today), _default_rules()
     )
-    target = output or Path(f"{root}-report.html")
     target.write_text(render_report(graph, findings, domain=root), encoding="utf-8")
     typer.secho(
         f"OK {root}: {len(graph.nodes)} nodes, {len(findings)} findings -> {target}",
