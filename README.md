@@ -87,3 +87,22 @@ More: [docs/methodology.md](docs/methodology.md).
   generated as links and never run automatically; crt.sh, Team Cymru and WHOIS servers are rate-limited.
 - **Findings are leads.** A takeover finding is inferred from DNS only; verify and report responsibly
   to the domain owner. This section is engineering context, not legal advice.
+
+## Improvement ideas
+
+Each one answers a limit documented above.
+
+- **A meaningful benchmark**: a domain with dozens of subdomains and logged certificates, several runs
+  per tool and a median, to replace the single-host run in [docs/evaluation.md](docs/evaluation.md).
+- **Keyed sources**: Censys, SecurityTrails or VirusTotal behind the same plugin contract, and a
+  keyed Subfinder/Amass baseline for a fairer comparison.
+- **Record which plugin saw each node** in every run (partly done for the benchmark) to explain
+  differences between tools instead of hypothesising.
+- **crt.sh resilience**: retry with backoff, fall back to a second CT search, and surface "source
+  degraded" in the report.
+- **Diff between scans**: store graphs over time and highlight new or vanished hosts, the useful
+  signal for continuous monitoring.
+- **More risk rules**: dangling NS delegations, expiring certificates across a whole estate, CAA
+  records, MTA-STS/TLS-RPT.
+- **Optional active mode, strictly opt-in**: confirming a takeover with one request would help, but it
+  breaks the passive invariant, so it would need an explicit scope flag and its own legal review.
