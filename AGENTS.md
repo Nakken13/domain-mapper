@@ -16,7 +16,7 @@ Typer (CLI), httpx + asyncio (collection), pydantic / pydantic-settings
 ```text
 src/domain_mapper/
   cli.py, config.py     Typer CLI, settings loaded from .env
-  scope.py              scope.yaml guard: refuses any out-of-scope domain
+  scope.py              scope guard: validates the domain, bounds the crawl (optional scope.yaml allow-list)
   privacy.py            personal-data filters (whois contacts, emails, query strings)
   models/               pydantic entities, relations, observations, findings
   collect/              async engine, httpx client, rate limiter, SQLite cache
@@ -40,7 +40,7 @@ py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .v
 .venv/Scripts/python -m pip install -e ".[dev]"
 .venv/Scripts/python -m pytest              # tests + coverage gate (80 %)
 .venv/Scripts/ruff check . && .venv/Scripts/ruff format --check .
-.venv/Scripts/domain-mapper scope check www.logan-villard.fr   # needs ./scope.yaml (gitignored)
+.venv/Scripts/domain-mapper scope check www.logan-villard.fr   # optional allow-list file; `scan` needs none
 ```
 
 Do not pipe rich/typer output into `head` on Windows: the closed pipe raises a
@@ -52,7 +52,7 @@ spurious `OSError: [Errno 22]` traceback.
   or its subdomains. Allowed traffic: third-party public sources (crt.sh, RDAP,
   Wayback CDX, Team Cymru, Shodan/Censys read-only) and DNS resolution through a
   resolver. Any new plugin must state its traffic in its module docstring.
-- **Scope first**: every entry point goes through `scope.py`. Out-of-scope nodes
+- **Scope first**: every entry point goes through `scope.py` (`Scope.for_domain`, or `--scope-file`). Out-of-scope nodes
   (e.g. a CNAME target on a CDN) are recorded and DNS-resolved, never enriched further.
 - **No personal data**: everything a plugin emits passes through `privacy.py`
   before entering the graph. No individual names or emails, ever.
@@ -67,7 +67,7 @@ spurious `OSError: [Errno 22]` traceback.
 API keys (Shodan, Censys, …) live only in `.env` (gitignored), loaded by
 `config.py`; `.env.example` lists the variables with empty values. Keys are
 never logged, never written to the cache, never included in the HTML report.
-`scope.yaml` is gitignored (`scope.example.yaml` is committed). See `SECURITY.md`.
+`scope.yaml` (optional allow-list) is gitignored (`scope.example.yaml` is committed). See `SECURITY.md`.
 
 ## Documentation routing
 

@@ -2,7 +2,8 @@
 
 ## Collection
 
-1. **Scope check.** The target must be listed in `scope.yaml` and not expired. Otherwise the run is
+1. **Validate.** The target is normalized (no IP, no bare TLD); the scope is the target and its
+   subdomains. With `--scope-file`, it must also be listed there and not expired. Otherwise the run is
    refused before any object that could touch the network exists.
 2. **Fan-out.** The async engine calls each plugin once per entity whose kind it consumes, starting
    from the scope root. Newly seen names feed the next round. Every outbound call goes through one

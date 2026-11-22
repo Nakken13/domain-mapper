@@ -114,6 +114,21 @@ class Scope:
         self.entries = sorted(entries, key=lambda e: len(e.domain), reverse=True)
 
     @classmethod
+    def for_domain(cls, raw_domain: str) -> Scope:
+        """Scope made of the scanned domain alone (and its subdomains): no file needed.
+
+        It no longer authorizes anything (the user declares that by running the scan); it only
+        keeps the crawl boundary: the target is fully mapped, third parties it points to (CDN,
+        mail provider...) are recorded and DNS-resolved, never enriched.
+        Raises InvalidDomainError for input that is not a scannable domain."""
+        domain = normalize_domain(raw_domain)
+        try:
+            entry = ScopeEntry(domain=domain, authorization="self-asserted by the operator")
+        except ValidationError as exc:  # bare TLD
+            raise InvalidDomainError(f"{raw_domain!r} is not a scannable domain") from exc
+        return cls([entry])
+
+    @classmethod
     def load(cls, path: Path) -> Scope:
         if not path.is_file():
             raise ScopeFileError(

@@ -126,3 +126,26 @@ def test_scan_rejects_an_unwritable_output_before_collecting(
     assert result.exit_code == 2
     assert "output" in result.output.lower()
     assert calls == []  # no plugin ran
+
+
+def test_scan_needs_no_scope_file(tmp_path: Path) -> None:
+    assert not (tmp_path / "scope.yaml").exists()
+    result = runner.invoke(cli.app, ["scan", "example.com"])
+    assert result.exit_code == 0, result.output
+    assert "domain:example.com" in calls
+    assert (tmp_path / "example.com-report.html").is_file()
+
+
+def test_scan_ignores_a_stray_scope_yaml_unless_asked(scope_file: Path) -> None:
+    # scope.yaml only lists example.com; a scan of another domain must not be refused by it.
+    result = runner.invoke(cli.app, ["scan", "other.org"])
+    assert result.exit_code == 0, result.output
+    assert "domain:other.org" in calls
+
+
+def test_scan_refuses_something_that_is_not_a_domain(tmp_path: Path) -> None:
+    result = runner.invoke(cli.app, ["scan", "com"])
+    assert result.exit_code == 1
+    assert "REFUSED" in result.output
+    assert calls == []
+    assert not (tmp_path / "cache").exists()

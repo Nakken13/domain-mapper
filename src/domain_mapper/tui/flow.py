@@ -1,7 +1,7 @@
-"""Menu flow: scope check, scan, open the last report. Delegates to the CLI commands.
+"""Menu flow: scan a domain, open the last report. Delegates to the CLI `scan` command.
 
-The default commands call `cli.scope_check` / `cli.scan` themselves, so the menu has no second
-code path: the scope is checked first, exactly as with `domain-mapper scan`.
+The default command calls `cli.scan` itself, so the menu has no second code path: the domain is
+validated first, exactly as with `domain-mapper scan`.
 """
 
 import sys
@@ -18,15 +18,13 @@ from domain_mapper.tui.prompts import InputFn, PrintFn, ask, choose
 from domain_mapper.tui.render import render_info
 
 OpenFn = Callable[[str], object]
-ScopeCheckFn = Callable[[str, Path], int]
-ScanFn = Callable[[str, Path, Path | None], int]
+ScanFn = Callable[[str, Path | None], int]
 
 _CLEAR_SCREEN = "\x1b[2J\x1b[3J\x1b[H"
-_ACTIONS = ("Scope check", "Scan a domain", "Open the last report")
+_ACTIONS = ("Scan a domain", "Open the last report")
 _ABOUT = (
     "domain-mapper maps the attack surface of a domain from public sources only (passive).",
-    "A domain is refused unless it is listed in your scope file: the check runs first and",
-    "nothing is queried for a refused domain.",
+    "Nothing is sent to the target itself: DNS, certificate logs and other public databases.",
     "Only use it on domains you own or are authorized to assess.",
 )
 
@@ -46,12 +44,8 @@ def _exit_code(command: Callable[..., None], *args: object) -> int:
     return 0
 
 
-def default_scope_check(domain: str, scope_file: Path) -> int:
-    return _exit_code(cli.scope_check, domain, scope_file)
-
-
-def default_scan(domain: str, scope_file: Path, output: Path | None) -> int:
-    return _exit_code(cli.scan, domain, scope_file, output)
+def default_scan(domain: str, output: Path | None) -> int:
+    return _exit_code(cli.scan, domain, output)
 
 
 def show_banner(print_fn: PrintFn) -> None:
@@ -61,7 +55,7 @@ def show_banner(print_fn: PrintFn) -> None:
 def _hostname(typed: str) -> str:
     """Hostname of a pasted URL (`https://host:8443/a?b` -> `host`); other input unchanged.
 
-    Typing convenience only: the strict validation and the scope gate still run on the result,
+    Typing convenience only: the strict validation still runs on the result,
     so garbage is refused exactly as before."""
     text = typed.strip()
     try:
@@ -71,13 +65,13 @@ def _hostname(typed: str) -> str:
     return host or typed
 
 
-def _scan(scope_file: Path, input_fn: InputFn, print_fn: PrintFn, scan_fn: ScanFn) -> Path | None:
+def _scan(input_fn: InputFn, print_fn: PrintFn, scan_fn: ScanFn) -> Path | None:
     """Asks domain and output, runs the scan; returns the report path if it was written."""
     domain = _hostname(ask("Domain to scan", optional=False, input_fn=input_fn, print_fn=print_fn))
     default = f"{domain}-report.html"
     answer = ask(f"Report file, default {default}", input_fn=input_fn, print_fn=print_fn)
     target = Path(answer or default)
-    return target if scan_fn(domain, scope_file, target) == 0 else None
+    return target if scan_fn(domain, target) == 0 else None
 
 
 def _open_report(last_report: Path | None, print_fn: PrintFn, open_fn: OpenFn) -> None:
@@ -97,8 +91,6 @@ def run(
     print_fn: PrintFn = print,
     open_fn: OpenFn = webbrowser.open,
     *,
-    scope_file: Path = Path("scope.yaml"),
-    scope_check_fn: ScopeCheckFn = default_scope_check,
     scan_fn: ScanFn = default_scan,
 ) -> None:
     """Main loop; returns when the user quits (`q`)."""
@@ -118,12 +110,7 @@ def run(
         )
     ) is not None:
         if index == 0:
-            domain = _hostname(
-                ask("Domain to check", optional=False, input_fn=input_fn, print_fn=print_fn)
-            )
-            scope_check_fn(domain, scope_file)
-        elif index == 1:
-            written = _scan(scope_file, input_fn, print_fn, scan_fn)
+            written = _scan(input_fn, print_fn, scan_fn)
             last_report = written or last_report
         else:
             _open_report(last_report, print_fn, open_fn)

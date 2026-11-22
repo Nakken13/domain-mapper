@@ -1,4 +1,4 @@
-"""Interactive numbered-menu version of the CLI (same engine, same scope check)."""
+"""Interactive numbered-menu version of the CLI (same engine, same validation)."""
 
 import sys
 

@@ -247,3 +247,26 @@ authorized:
     decision = loaded.check("app.client.parent.example", today=TODAY)
     assert not decision.allowed
     assert "expired" in decision.reason
+
+
+# --- no scope file: the scanned domain itself bounds the crawl -------------------------------
+
+
+def test_for_domain_covers_the_domain_and_its_subdomains_only() -> None:
+    scope = Scope.for_domain("Example.COM")
+    assert scope.check("example.com", today=TODAY).allowed
+    assert scope.check("a.b.example.com", today=TODAY).allowed
+    assert not scope.check("example.org", today=TODAY).allowed
+    assert not scope.check("evilexample.com", today=TODAY).allowed
+
+
+def test_for_domain_keeps_a_deep_target_as_the_root() -> None:
+    scope = Scope.for_domain("www.example.com")
+    assert scope.check("www.example.com", today=TODAY).allowed
+    assert not scope.check("example.com", today=TODAY).allowed
+
+
+@pytest.mark.parametrize("bad", ["com", "", "192.0.2.1", "not a domain", "https://example.com"])
+def test_for_domain_rejects_what_is_not_a_scannable_domain(bad: str) -> None:
+    with pytest.raises(InvalidDomainError):
+        Scope.for_domain(bad)

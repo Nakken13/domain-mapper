@@ -1,6 +1,6 @@
 """Command-line interface.
 
-Exit codes for `scope check` and `scan`: 0 ok, 1 refused (out of scope), 2 unusable scope file.
+Exit codes for `scope check` and `scan`: 0 ok, 1 refused (invalid or out of scope), 2 unusable file.
 """
 
 import asyncio
@@ -28,10 +28,10 @@ from domain_mapper.risk.email_auth import EmailAuthRule
 from domain_mapper.risk.exposed_envs import ExposedEnvironmentRule
 from domain_mapper.risk.hosting import HostingSprawlRule
 from domain_mapper.risk.takeover import TakeoverRule
-from domain_mapper.scope import OutOfScopeError, Scope, ScopeFileError
+from domain_mapper.scope import InvalidDomainError, OutOfScopeError, Scope, ScopeFileError
 
 app = typer.Typer(
-    help="Passive attack-surface mapping, restricted to domains listed in scope.yaml.",
+    help="Passive attack-surface mapping from public sources only.",
 )
 scope_app = typer.Typer(help="Inspect the authorization scope.", no_args_is_help=True)
 app.add_typer(scope_app, name="scope")
@@ -62,7 +62,7 @@ def main(
         ),
     ] = False,
 ) -> None:
-    """domain-mapper: passive sources only, authorized domains only.
+    """domain-mapper: passive sources only; only scan what you own or may assess.
 
     Without a command: opens the interactive menu on a terminal, otherwise prints this help.
     """
@@ -126,23 +126,33 @@ async def _collect(domain: str, scope: Scope, settings: Settings, today: date) -
 
 @app.command("scan")
 def scan(
-    domain: Annotated[str, typer.Argument(help="Authorized domain to map (passive sources only).")],
-    scope_file: ScopeFileOption = Path("scope.yaml"),
+    domain: Annotated[str, typer.Argument(help="Domain to map (passive sources only).")],
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Report path (default: <domain>-report.html)."),
     ] = None,
+    scope_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--scope-file",
+            "-s",
+            help="Optional authorization file (multi-domain, expiry). Default: scan DOMAIN alone.",
+        ),
+    ] = None,
 ) -> None:
     """Map DOMAIN from public sources and write a self-contained HTML report."""
     try:
-        scope = Scope.load(scope_file)
+        scope = Scope.load(scope_file) if scope_file else Scope.for_domain(domain)
     except ScopeFileError as exc:
         typer.secho(f"ERROR {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=2) from exc
+    except InvalidDomainError as exc:
+        typer.secho(f"REFUSED {exc}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from exc
 
     today = date.today()
     try:
-        # Scope first: nothing below (cache, HTTP client, plugins) exists before this passes.
+        # Validate first: nothing below (cache, HTTP client, plugins) exists before this passes.
         root = scope.require(domain, today=today)
     except OutOfScopeError as exc:
         typer.secho(f"REFUSED {exc}", fg=typer.colors.RED)

@@ -1,4 +1,5 @@
-# Copy to `scope.yaml` (gitignored). domain-mapper refuses any domain not listed here.
+# OPTIONAL allow-list: pass it with `domain-mapper scan <domain> --scope-file scope.yaml` (gitignored).
+# Without it, `scan` maps the domain you type and its subdomains only. With it, any domain not listed here is refused.
 # List ONLY domains you own or have a WRITTEN authorization to assess
 # (unauthorized access attempts: French Penal Code, art. 323-1).
 

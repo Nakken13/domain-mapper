@@ -8,9 +8,11 @@ never logged, cached, or rendered into reports.
 
 ## Auth boundaries
 
-No user auth (local CLI). The authorization boundary is `scope.yaml`
-(gitignored): the tool refuses any domain not listed there, with exact suffix
-matching (`evil-example.com` does not match `example.com`).
+No user auth (local CLI). Authorization is self-declared by running the scan: the tool is passive
+(no traffic to the target) and cannot verify ownership. By default the crawl is bounded to the
+scanned domain and its subdomains, with exact suffix matching (`evil-example.com` does not match
+`example.com`). An optional `--scope-file` (`scope.yaml`, gitignored) adds an allow-list with
+expiry dates for teams/CI.
 
 ## Sensitive data / PII
 

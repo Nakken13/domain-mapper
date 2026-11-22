@@ -26,4 +26,4 @@ self-contained HTML report, evaluation against Amass/Subfinder (passive) on
   target (so subdomain takeover detection is DNS-only: risky CNAME provider + NXDOMAIN).
 - Automated Google scraping: dorks are generated, run manually.
 - Any collection of personal data (names, individual emails).
-- Running on a domain not listed in `scope.yaml`.
+- Running on a domain you are not authorized to assess (self-declared, not verifiable by the tool).

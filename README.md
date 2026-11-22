@@ -28,7 +28,7 @@
 
 Passive attack-surface mapping of a domain you own or are authorized to assess, rendered as a graph.
 
-> Use only on domains listed in your `scope.yaml` (see [Ethics & legal](#ethics--legal)).
+> Use only on domains you own or are authorized to assess (see [Ethics & legal](#ethics--legal)).
 
 ## Quick start
 
@@ -36,21 +36,19 @@ Passive attack-surface mapping of a domain you own or are authorized to assess, 
 py -3.11 -m venv .venv                      # Linux/macOS: python3.11 -m venv .venv
 .venv/Scripts/activate                      # Linux/macOS: source .venv/bin/activate
 python -m pip install -e ".[dev]"
-cp scope.example.yaml scope.yaml            # list ONLY domains you are authorized to assess
-domain-mapper scope check example.com
 domain-mapper scan example.com -o example.com-report.html   # needs network access to the public sources
 ```
 
-Edit `scope.yaml` first: `example.com` is a placeholder, and entries can carry an `expires` date after
-which the domain is refused.
+No configuration file: running the scan is your declaration that you own the domain or may assess it.
+Need a multi-domain allow-list with expiry dates (team, CI)? Pass `--scope-file scope.yaml`
+(copy `scope.example.yaml`): the scan is then refused for any domain not listed.
 
 The report is a single self-contained HTML file (Cytoscape.js inlined): open it offline.
 
 ## Menu (TUI)
 
-Prefer a menu to flags? Running `domain-mapper` with no command opens a numbered menu (banner, scope check,
-scan, open the last report); `domain-mapper-tool` is an alias. It needs an interactive terminal and the same
-`scope.yaml` in the current directory. Without a terminal (pipe, CI), plain `domain-mapper` prints the help.
+Prefer a menu to flags? Running `domain-mapper` with no command opens a numbered menu (banner,
+scan, open the last report); `domain-mapper-tool` is an alias. It needs an interactive terminal. Without a terminal (pipe, CI), plain `domain-mapper` prints the help.
 
 ```bash
 domain-mapper
@@ -58,13 +56,12 @@ domain-mapper
 
 | Key | Action |
 |---|---|
-| `1` | Scope check: is a domain covered by `scope.yaml`? |
-| `2` | Scan a domain, then write the HTML report (default `<domain>-report.html`) |
-| `3` | Open the last report written in this session in the browser |
+| `1` | Scan a domain (a pasted URL works), then write the HTML report (default `<domain>-report.html`) |
+| `2` | Open the last report written in this session in the browser |
 | `0` | About, `q` quit |
 
-The menu calls the same `scope check` and `scan` code as the CLI, so the scope is checked first and an
-out-of-scope domain is refused without any request. If the command is not found after pulling, re-run
+The menu calls the same `scan` code as the CLI, so the domain is validated first and an invalid one is
+refused without any request. If the command is not found after pulling, re-run
 `python -m pip install -e ".[dev]"` to register the new entry point.
 
 ## Demo
@@ -80,7 +77,7 @@ real target has a single host. Regenerate it with
 
 ```mermaid
 flowchart LR
-    scope[("scope.yaml")] --> guard["scope.py<br/>scope guard"]
+    scope[("domain<br/>+ optional scope.yaml")] --> guard["scope.py<br/>validate + crawl boundary"]
     guard --> engine["collect/engine<br/>async, rate-limited, cached"]
     engine --> plugins["plugins/<br/>one passive source per module"]
     plugins -->|Observation| priv["privacy.py<br/>personal-data filters"]
@@ -114,7 +111,7 @@ invisible. Full table and "what passive cannot see": [docs/sources.md](docs/sour
 
 ## Methodology
 
-1. **Scope check**: the domain must be in `scope.yaml`, else the run is refused before any network object exists.
+1. **Validate**: the domain is normalized and checked (no IP, no bare TLD), else the run is refused before any network object exists. It also fixes the crawl boundary: the target and its subdomains.
 2. **Collect**: an async engine fans out over the plugins, behind one HTTP client (per-source token bucket,
    default 1 request/s; SQLite cache; redirects never followed; a request to the target or its subdomains
    raises `PassiveViolationError`). DNS, ASN and WHOIS traffic goes through its own clients, each limited to
@@ -131,14 +128,14 @@ More: [docs/methodology.md](docs/methodology.md).
 
 ## Ethics & legal
 
-- **Authorization first.** Being passive does not grant authorization, and `scope.yaml` is a self-declared
-  control, not proof of it. Only map domains you own or hold written permission to assess. In France,
+- **Authorization first.** Being passive does not grant authorization, and the tool cannot verify it:
+  running a scan is a self-declaration. Only map domains you own or hold written permission to assess. In France,
   fraudulently accessing or remaining in an automated data processing system is an offence under
   **Code pénal art. 323-1** (up to three years' imprisonment and a EUR 100,000 fine at the time of
   writing; check [Légifrance](https://www.legifrance.gouv.fr/) for the current text). Probing a
   system you are not authorized to test can fall under it, even with good intentions.
-- **Enforced, not just advised.** `scope.yaml` lists authorized domains with an optional expiry;
-  every entry point goes through `scope.py`, and an out-of-scope domain is refused before any
+- **Bounded.** The crawl is limited to the scanned domain and its subdomains; an optional
+  `--scope-file` adds an allow-list with expiry dates that refuses everything else before any
   network object is created.
 - **Passive by design.** No port scan, no bruteforce, no HTTP request to the target or its
   subdomains (the HTTP client raises `PassiveViolationError`). Out-of-scope names met on the way, such
