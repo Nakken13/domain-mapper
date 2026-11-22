@@ -22,6 +22,7 @@ ScanFn = Callable[[str, Path | None], int]
 
 _CLEAR_SCREEN = "\x1b[2J\x1b[3J\x1b[H"
 _ACTIONS = ("Scan a domain", "Open the last report")
+_HINTS = ("map its public surface", "view it in your browser")
 _ABOUT = (
     "domain-mapper maps the attack surface of a domain from public sources only (passive).",
     "Nothing is sent to the target itself: DNS, certificate logs and other public databases.",
@@ -49,7 +50,7 @@ def default_scan(domain: str, output: Path | None) -> int:
 
 
 def show_banner(print_fn: PrintFn) -> None:
-    print_fn(_CLEAR_SCREEN + "\n" + banner().rstrip("\n"))
+    print_fn(_CLEAR_SCREEN + "\n" + banner(color=sys.stdout.isatty()).rstrip("\n"))
 
 
 def _hostname(typed: str) -> str:
@@ -103,6 +104,7 @@ def run(
         index := choose(
             "domain-mapper",
             _ACTIONS,
+            hints=_HINTS,
             back="Quit",
             on_info=show_about,
             input_fn=input_fn,

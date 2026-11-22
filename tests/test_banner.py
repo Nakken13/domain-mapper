@@ -52,3 +52,25 @@ def test_banner_skips_the_braille_art_when_the_terminal_is_too_narrow(terminal):
     text = banner()
     assert "⣿" not in text  # wrapped braille would be garbled
     assert f"v{__version__}" in text
+
+
+def test_banner_is_plain_by_default(terminal):
+    terminal(120)
+    assert "\x1b" not in banner()
+
+
+def test_banner_color_paints_a_gradient_but_keeps_the_same_text(terminal, monkeypatch):
+    import re
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    terminal(120)
+    colored = banner(color=True)
+    assert "\x1b[" in colored
+    assert re.sub(r"\x1b\[[0-9;]*m", "", colored) == banner()
+    assert "38;2;" in colored or "38;5;" in colored
+
+
+def test_banner_color_respects_no_color(terminal, monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    terminal(120)
+    assert banner(color=True) == banner()

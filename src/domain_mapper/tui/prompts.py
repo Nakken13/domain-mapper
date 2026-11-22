@@ -3,7 +3,7 @@
 import sys
 from collections.abc import Callable, Sequence
 
-from domain_mapper.tui.render import menu_prompt, render_menu
+from domain_mapper.tui.render import field_prompt, menu_prompt, render_menu
 
 InputFn = Callable[[str], str]
 PrintFn = Callable[[str], None]
@@ -13,6 +13,7 @@ def choose(
     title: str,
     options: Sequence[str],
     *,
+    hints: Sequence[str] = (),
     back: str = "Back",
     on_info: Callable[[], None] | None = None,
     input_fn: InputFn = input,
@@ -23,14 +24,18 @@ def choose(
     With `on_info`, an extra `0` entry calls it, then the menu is shown again."""
     color = sys.stdout.isatty()
     show_info = on_info is not None
-    print_fn("\n" + render_menu(title, options, back=back, info=show_info, color=color))
+    print_fn(
+        "\n" + render_menu(title, options, hints=hints, back=back, info=show_info, color=color)
+    )
     while True:
         entry = input_fn(menu_prompt(color=color)).strip()
         if entry.lower() == "q":
             return None
         if entry == "0" and on_info is not None:
             on_info()
-            print_fn("\n" + render_menu(title, options, back=back, info=True, color=color))
+            print_fn(
+                "\n" + render_menu(title, options, hints=hints, back=back, info=True, color=color)
+            )
             continue
         if entry.isascii() and entry.isdigit() and 1 <= int(entry) <= len(options):
             return int(entry) - 1
@@ -45,7 +50,7 @@ def ask(
     print_fn: PrintFn = print,
 ) -> str:
     """Free input; ENTER returns "" if `optional`, otherwise asks again."""
-    prompt_text = f"{label} (ENTER to skip) : " if optional else f"{label} : "
+    prompt_text = field_prompt(label, skip=optional, color=sys.stdout.isatty())
     while True:
         entry = input_fn(prompt_text).strip()
         if entry or optional:
