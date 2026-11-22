@@ -66,6 +66,34 @@ def test_scan_uses_default_report_name_when_output_left_empty():
     assert session.scans == [("example.com", SCOPE, Path("example.com-report.html"))]
 
 
+@pytest.mark.parametrize(
+    "typed",
+    [
+        "https://example.com",
+        "https://example.com/",
+        "HTTP://Example.com:8443/a/b?q=1#x",
+        "https://user@example.com/",
+        "example.com/path",
+    ],
+)
+def test_scan_accepts_a_pasted_url_and_scans_its_hostname(typed: str):
+    session = Session("2", typed, "", "q")
+    session.run()
+    assert session.scans == [("example.com", SCOPE, Path("example.com-report.html"))]
+
+
+def test_scope_check_accepts_a_pasted_url():
+    session = Session("1", "https://example.com/", "q")
+    session.run()
+    assert session.checks == [("example.com", SCOPE)]
+
+
+def test_non_url_garbage_is_left_for_the_scope_gate_to_refuse():
+    session = Session("2", "not a domain", "", "q")
+    session.run()
+    assert [scan[0] for scan in session.scans] == ["not a domain"]
+
+
 def test_scan_uses_the_chosen_output_path():
     session = Session("2", "example.com", "out.html", "q")
     session.run()

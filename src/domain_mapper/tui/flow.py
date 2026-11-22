@@ -8,6 +8,7 @@ import sys
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import typer
 
@@ -57,9 +58,22 @@ def show_banner(print_fn: PrintFn) -> None:
     print_fn(_CLEAR_SCREEN + "\n" + banner().rstrip("\n"))
 
 
+def _hostname(typed: str) -> str:
+    """Hostname of a pasted URL (`https://host:8443/a?b` -> `host`); other input unchanged.
+
+    Typing convenience only: the strict validation and the scope gate still run on the result,
+    so garbage is refused exactly as before."""
+    text = typed.strip()
+    try:
+        host = urlsplit(text if "://" in text else f"//{text}").hostname
+    except ValueError:
+        return typed
+    return host or typed
+
+
 def _scan(scope_file: Path, input_fn: InputFn, print_fn: PrintFn, scan_fn: ScanFn) -> Path | None:
     """Asks domain and output, runs the scan; returns the report path if it was written."""
-    domain = ask("Domain to scan", optional=False, input_fn=input_fn, print_fn=print_fn)
+    domain = _hostname(ask("Domain to scan", optional=False, input_fn=input_fn, print_fn=print_fn))
     default = f"{domain}-report.html"
     answer = ask(f"Report file, default {default}", input_fn=input_fn, print_fn=print_fn)
     target = Path(answer or default)
@@ -104,7 +118,9 @@ def run(
         )
     ) is not None:
         if index == 0:
-            domain = ask("Domain to check", optional=False, input_fn=input_fn, print_fn=print_fn)
+            domain = _hostname(
+                ask("Domain to check", optional=False, input_fn=input_fn, print_fn=print_fn)
+            )
             scope_check_fn(domain, scope_file)
         elif index == 1:
             written = _scan(scope_file, input_fn, print_fn, scan_fn)
